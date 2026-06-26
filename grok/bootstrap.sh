@@ -22,3 +22,11 @@ if [ -n "$host" ]; then
     [ -e "$file" ] && sed -i "s|__HOST__|$host|g" "$file"
   done
 fi
+
+# --- safety net -------------------------------------------------------------
+# Belt-and-suspenders: no file under /workspace may survive bootstrap with a raw
+# __TRIBES_* placeholder. grok's ONLY placeholder (__TRIBES_THEME__ in
+# .grok/config.toml) is filled per-launch in launch.sh, which also recreates the
+# file if missing — so removing it here is harmless. AGENTS.md only carries
+# __HOST__, so it is not matched.
+grep -rlZ "__TRIBES_" /workspace 2>/dev/null | xargs -0 rm -f 2>/dev/null || true

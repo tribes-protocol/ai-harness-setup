@@ -52,4 +52,15 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
       print
     }
   ' "$cfg" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+else
+  # No proxy env (BYO key) — never leave raw placeholders on disk. Drop the
+  # proxy-provider seed (keep the static exec-approvals.json); openclaw then
+  # uses its own provider/creds.
+  rm -f /workspace/.openclaw/openclaw.json
 fi
+
+# --- safety net -------------------------------------------------------------
+# Belt-and-suspenders: no file under /workspace may survive with a raw
+# __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
+# __HOST__, so it is not matched.
+grep -rlZ "__TRIBES_" /workspace 2>/dev/null | xargs -0 rm -f 2>/dev/null || true

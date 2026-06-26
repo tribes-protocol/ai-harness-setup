@@ -71,3 +71,9 @@ else
 }
 EOF
 fi
+
+# --- safety net -------------------------------------------------------------
+# Belt-and-suspenders: no file under /workspace may survive with a raw
+# __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
+# __HOST__, so it is not matched.
+grep -rlZ "__TRIBES_" /workspace 2>/dev/null | xargs -0 rm -f 2>/dev/null || true

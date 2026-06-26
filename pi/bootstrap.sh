@@ -49,4 +49,14 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
   fill "$m" "__TRIBES_TOKEN__" "$token"
   fill "$m" "__TRIBES_MODELS__" "$pi_models"
   fill "$s" "__TRIBES_MODEL__" "$TRIBES_LLM_MODEL"
+else
+  # No proxy env (BYO key) — never leave raw placeholders on disk. Drop both seed
+  # files; pi then falls back to its own provider/creds.
+  rm -f /workspace/.pi/agent/models.json /workspace/.pi/agent/settings.json
 fi
+
+# --- safety net -------------------------------------------------------------
+# Belt-and-suspenders: no file under /workspace may survive with a raw
+# __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
+# __HOST__, so it is not matched.
+grep -rlZ "__TRIBES_" /workspace 2>/dev/null | xargs -0 rm -f 2>/dev/null || true

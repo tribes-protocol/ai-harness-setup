@@ -39,3 +39,10 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
     --baseurl "$proxy" \
     --modelid "$TRIBES_LLM_MODEL" >/dev/null 2>&1 || true
 fi
+
+# --- safety net -------------------------------------------------------------
+# Belt-and-suspenders: no file under /workspace may survive with a raw
+# __TRIBES_* placeholder. cline has no committed seed config (auth is a runtime
+# command), so this is a no-op guard. AGENTS.md only carries __HOST__, so it is
+# not matched.
+grep -rlZ "__TRIBES_" /workspace 2>/dev/null | xargs -0 rm -f 2>/dev/null || true

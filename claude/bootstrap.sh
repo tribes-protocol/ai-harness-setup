@@ -20,3 +20,10 @@ if [ -n "$host" ]; then
     [ -e "$file" ] && sed -i "s|__HOST__|$host|g" "$file"
   done
 fi
+
+# --- safety net -------------------------------------------------------------
+# Belt-and-suspenders: no file under /workspace may survive with a raw
+# __TRIBES_* placeholder. claude config is fully static (no placeholders) and the
+# proxy is ENV-only in launch.sh, so this is a no-op guard. AGENTS.md/CLAUDE.md
+# only carry __HOST__, so they are not matched.
+grep -rlZ "__TRIBES_" /workspace 2>/dev/null | xargs -0 rm -f 2>/dev/null || true

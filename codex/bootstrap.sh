@@ -22,4 +22,15 @@ command -v codex >/dev/null 2>&1 ||
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
   sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" /workspace/.codex/config.toml
   sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" /workspace/.codex/config.toml
+else
+  # No proxy env (BYO key) — never leave raw placeholders on disk. Drop the seed
+  # entirely; codex then uses its own provider/creds, and the launch flag
+  # --dangerously-bypass-approvals-and-sandbox covers approvals.
+  rm -f /workspace/.codex/config.toml
 fi
+
+# --- safety net -------------------------------------------------------------
+# Belt-and-suspenders: no file under /workspace may survive with a raw
+# __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
+# __HOST__, so it is not matched.
+grep -rlZ "__TRIBES_" /workspace 2>/dev/null | xargs -0 rm -f 2>/dev/null || true
