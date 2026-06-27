@@ -15,7 +15,8 @@ npm install -g --no-fund --no-audit @anthropic-ai/claude-code@latest || true
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
 curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || true
-[ -n "$HOSTNAME" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$HOSTNAME|g" /workspace/AGENTS.md
+host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
+[ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
 # claude also reads CLAUDE.md — give it the same primer.
 [ -e /workspace/AGENTS.md ] && cp /workspace/AGENTS.md /workspace/CLAUDE.md
 

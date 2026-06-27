@@ -18,7 +18,8 @@ command -v hermes >/dev/null 2>&1 ||
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
 curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || true
-[ -n "$HOSTNAME" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$HOSTNAME|g" /workspace/AGENTS.md
+host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
+[ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
 
 # --- proxy-routed config ----------------------------------------------------
 # Fill the seed config's placeholders. Hermes declares a user `tribes` provider in

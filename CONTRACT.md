@@ -44,7 +44,7 @@ harnesses that can't auto-discover a custom provider (openclaw/opencode/pi embed
 - The harness's **real config files** (committed, with the placeholders above).
 - `bootstrap.sh`  — install the harness binary; `sed` the placeholders in the seeded
   config files; fetch + embed the model catalog IF the harness needs it; substitute
-  `__HOST__`→`$HOSTNAME` in AGENTS.md. Runs ONCE, as root, cwd `/workspace`, POSIX `sh`.
+  `__HOST__`→`$HOSTNAME` (falling back to `hostname`) in AGENTS.md. Runs ONCE, as root, cwd `/workspace`, POSIX `sh`.
 - `launch.sh`     — `export` any **env-based** creds (claude ANTHROPIC_*, codex
   OPENAI_API_KEY, grok GROK_*); re-`sed` `__TRIBES_THEME__` for harnesses whose theme
   is a file value (grok/hermes) so a toggle takes effect on relaunch; then
