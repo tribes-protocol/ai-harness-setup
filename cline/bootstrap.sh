@@ -10,9 +10,11 @@
 # needs the `cline` binary plus runtime creds, so it is inherently runtime and
 # there is no static file to commit (no heredoc to convert to a seed file).
 #
-# Installs the Cline CLI, then runs that auth command AFTER install. Cline has
-# no env-based proxy config — its auth lives entirely in that file — so
-# launch.sh exports nothing. Cline also has no theme support (hardcoded palette).
+# Installs the Cline CLI ONLY. The `cline auth` command that writes the provider
+# file is NOT here — it lives in launch.sh and runs EVERY boot, so a PAUSE ->
+# RESTORE re-auths with the freshly re-minted TRIBES_API_KEY (the token a restore
+# re-mints would otherwise stay the stale, revoked one baked at first boot). Cline
+# has no env-based proxy config and no theme support (hardcoded palette).
 set -e
 
 # --- install ----------------------------------------------------------------
@@ -26,21 +28,11 @@ curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || tru
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 [ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
 
-# --- proxy-routed config ----------------------------------------------------
-# Cline → OpenAI-Compatible provider via its own `cline auth` command (the
-# stable interface; it writes ~/.cline/data/settings/providers.json). The
-# provider lists the full catalog from the proxy's GET /models; --modelid just
-# preselects the default. The bearer is the apikey. Never pin one model here.
-# Skip gracefully if the proxy env is absent — the CLI then falls back to
-# whatever creds the user supplies.
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
-  proxy="${API_BASE_URL}/llm/proxy"
-  token="$TRIBES_API_KEY"
-  cline auth openai-compatible \
-    --apikey "$token" \
-    --baseurl "$proxy" \
-    --modelid "$TRIBES_LLM_MODEL" >/dev/null 2>&1 || true
-fi
+# --- proxy-routed config: see launch.sh -------------------------------------
+# The `cline auth openai-compatible ...` command that writes cline's provider
+# file (~/.cline/data/settings/providers.json) is deliberately in launch.sh, NOT
+# here: it must re-run on EVERY boot so a RESTORE picks up the re-minted token
+# (running it once here would leave a restored box authed with the revoked key).
 
 # --- safety net -------------------------------------------------------------
 # Belt-and-suspenders: no file under /workspace may survive with a raw

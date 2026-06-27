@@ -69,6 +69,35 @@ is LOST before the harness launches. Therefore:
   **launch.sh**, right before `exec`, because only that process's env reaches the
   harness.
 
+## CRITICAL: the proxy TOKEN must be refreshed every launch (restore-safety)
+
+`TRIBES_API_KEY` is the one runtime value that can **change across boots of the same
+disk**. A pause archives the disk to R2; a restore boots that disk again but the
+control plane **RE-MINTS** the per-sandbox key — it REVOKES the old token and injects
+a fresh `TRIBES_API_KEY` on the boot cmdline. The proxy rejects the revoked token
+(401), so a box restored with its first-boot token baked into a config file comes
+back with a dead LLM key.
+
+Therefore a **file-based** harness (one whose token lives in an on-disk config, not an
+env export) MUST re-apply the live token in **launch.sh** on every launch — not only
+in `bootstrap.sh` (which runs once). The proxy URL, model, and embedded catalog do
+NOT change on restore, so they stay seeded in `bootstrap.sh`; only the token is
+refreshed per launch. Idiomatically, mirror the per-launch theme re-`sed`:
+
+```sh
+# Re-point the on-disk apiKey at the live cmdline token (the proxy token is
+# tribes_sb_...). No-op on a cold boot; skipped on BYO/unset.
+CFG=/workspace/.<harness>/config.json
+if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
+  sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
+fi
+```
+
+`cline` (whose token lives in a binary-managed provider file) instead re-runs its
+`cline auth ...` command in `launch.sh` every boot. **env-based** harnesses
+(`claude`/`codex`/`grok`) already export the live `TRIBES_API_KEY` each launch, so
+they are restore-safe by construction. Covered by `test/launch-token-refresh.test.sh`.
+
 ## Env vars available at runtime (injected by the control plane)
 
 - `TRIBES_LLM_MODEL` — the default model id to preselect (e.g. `deepseek-v4-flash`)
