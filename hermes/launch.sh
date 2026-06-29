@@ -25,4 +25,18 @@ if [ -n "$TRIBES_API_KEY" ] && [ -f /workspace/.hermes/config.yaml ]; then
   sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" /workspace/.hermes/config.yaml
 fi
 
+# --- seal the venv against banner-time lazy installs ------------------------
+# hermes-agent's startup show_banner() -> get_tool_definitions() runs EVERY
+# toolset's requirements check_fn, and the TTS check (check_tts_requirements ->
+# _import_edge_tts) — plus the browser check — trigger a BLOCKING `pip install`
+# of optional deps (edge-tts, Playwright Chromium) on EVERY launch. They never
+# persist in this rootfs, so each relaunch re-attempts the slow install, which
+# floods/stalls startup and breaks the exit->bash->relaunch cycle (the dropped
+# bash can't hold while the relaunched hermes is mid-install). This env var is
+# hermes-agent's own opt-out (the upstream Docker image sets it): the checks then
+# report the tool "unavailable" instead of installing, so hermes boots instantly.
+# Core LLM chat + its tools are unaffected; only optional audio/browser tools that
+# need extra runtime deps are skipped — fine for a microVM agent.
+export HERMES_DISABLE_LAZY_INSTALLS=1
+
 exec hermes --yolo
