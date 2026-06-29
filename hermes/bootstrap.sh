@@ -11,8 +11,19 @@ set -e
 # --skip-setup: the Nous installer otherwise runs an INTERACTIVE `hermes setup`
 # wizard that reads /dev/tty and blocks bootstrap.sh forever (the dispatcher never
 # reaches its launch loop). We seed config.yaml ourselves below, so skip the wizard.
-command -v hermes >/dev/null 2>&1 ||
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup
+# Redirect the installer's output to a log, NOT the terminal: the Nous install.sh
+# apt-installs a large X11/font/ffmpeg stack and downloads Chromium, emitting
+# hundreds of KB of "Get:/Unpacking/Setting up" lines. That fills the in-VM
+# bridge's scrollback, and on the exit->bash reconnect the bridge REPLAYS that
+# whole buffer — flooding the fresh socket so the sandboxd:validate exitToShell
+# probe (a single `echo` in the dropped bash) is buried and bash looks dead. The
+# other harnesses install one quiet npm/binary, so their replay is tiny; keep
+# hermes's bootstrap equally quiet. `|| true` so a non-zero installer exit can't
+# abort bootstrap (which would drop the once-only marker and re-run everything).
+if ! command -v hermes >/dev/null 2>&1; then
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
+    | bash -s -- --skip-setup >/var/log/hermes-install.log 2>&1 || true
+fi
 
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
