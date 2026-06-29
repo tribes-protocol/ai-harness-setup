@@ -11,10 +11,26 @@ set -e
 # --skip-setup: the Nous installer otherwise runs an INTERACTIVE `hermes setup`
 # wizard that reads /dev/tty and blocks bootstrap.sh forever (the dispatcher never
 # reaches its launch loop). We seed config.yaml ourselves below, so skip the wizard.
+#
+# --skip-browser: this is the boot-speed fix. WITHOUT it the installer's
+# `node-deps` stage runs `playwright install --with-deps chromium`, which downloads
+# the ~170MB Chromium engine AND apt-installs the heavy X11/nss/atk/font system-lib
+# stack — by far the slowest part of a cold boot (measured ~42s on a fast-network
+# host, minutes on a slow one). A proxy-routed chat agent in a microVM never drives
+# a real browser, so none of that is needed on the interactive boot path. CRUCIAL:
+# --skip-browser does NOT skip the node-deps the TUI needs — the installer ALWAYS
+# runs `npm install` first and only gates the `playwright install chromium` step on
+# this flag (see install_node_deps in the Nous install.sh). Verified empirically:
+# with Chromium absent, hermes still paints its full TUI (welcome banner, input
+# box, status line) — there is no degraded/spinner-gallery UI. This corrects the
+# 07dcc0c revert, whose premise ("--skip-browser drops node-deps the TUI needs")
+# does not hold for the current installer. (HERMES_DISABLE_LAZY_INSTALLS=1 in
+# launch.sh already stops any runtime lazy re-install attempt, so the browser tool
+# simply reports "unavailable" instead of blocking startup.)
+#
 # Redirect the installer's output to a log, NOT the terminal: the Nous install.sh
-# apt-installs a large X11/font/ffmpeg stack and downloads Chromium, emitting
-# hundreds of KB of "Get:/Unpacking/Setting up" lines. That fills the in-VM
-# bridge's scrollback, and on the exit->bash reconnect the bridge REPLAYS that
+# still emits "Get:/Unpacking/Setting up" lines (python/node deps), which fill the
+# in-VM bridge's scrollback; on the exit->bash reconnect the bridge REPLAYS that
 # whole buffer — flooding the fresh socket so the sandboxd:validate exitToShell
 # probe (a single `echo` in the dropped bash) is buried and bash looks dead. The
 # other harnesses install one quiet npm/binary, so their replay is tiny; keep
@@ -26,11 +42,11 @@ if ! command -v hermes >/dev/null 2>&1; then
   # `... >/log 2>&1` makes the installer's stdout a NON-tty, and the Nous
   # install.sh then builds a degraded TUI (the agent comes up missing its full
   # UI), which breaks the resize check. (2) Letting it write to the terminal fills
-  # the bridge scrollback with the apt/Chromium install log, which the exit->bash
-  # reconnect replays and buries the exitToShell probe. `script` gives it a real
-  # tty (full TUI build) while keeping every byte off the dispatcher terminal.
+  # the bridge scrollback with the install log, which the exit->bash reconnect
+  # replays and buries the exitToShell probe. `script` gives it a real tty (full
+  # TUI build) while keeping every byte off the dispatcher terminal.
   script -qec \
-    'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup' \
+    'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser' \
     /var/log/hermes-install.log >/dev/null 2>&1 || true
 fi
 
