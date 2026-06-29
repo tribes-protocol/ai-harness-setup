@@ -21,8 +21,15 @@ set -e
 # hermes's bootstrap equally quiet. `|| true` so a non-zero installer exit can't
 # abort bootstrap (which would drop the once-only marker and re-run everything).
 if ! command -v hermes >/dev/null 2>&1; then
+  # --skip-browser: do NOT install Playwright/Chromium + the apt X11/font/ffmpeg
+  # stack. That download is minutes long and, when it races the sandboxd:validate
+  # checks (esp. under concurrency), the harness isn't fully up — notStuck renders
+  # a sparse screen, resize can't reflow, and the exit cycle lands mid-install.
+  # The browser/computer_use toolsets are disabled in config.yaml, so Chromium is
+  # never used anyway. --non-interactive skips any input-needing stage.
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
-    | bash -s -- --skip-setup >/var/log/hermes-install.log 2>&1 || true
+    | bash -s -- --skip-setup --skip-browser --non-interactive \
+      >/var/log/hermes-install.log 2>&1 || true
 fi
 
 # --- seed the shared agent primer -------------------------------------------
