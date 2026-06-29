@@ -10,3 +10,22 @@ providers:
     default_model: "__TRIBES_MODEL__"
 display:
   skin: __TRIBES_SKIN__
+# Hard-suppress the toolsets that self-install heavy runtime deps on first
+# INTERACTIVE start: `browser`/`computer_use` run `agent-browser install
+# --with-deps` (apt X11/font libs + a ~170MB Playwright Chromium download),
+# `tts` lazy-pip-installs edge-tts, and video/image/vision/spotify pull their own
+# engines. That multi-minute storm floods the terminal and breaks the
+# exit->bash->relaunch cycle (sandboxd:validate exitToShell). A microVM coding
+# agent needs none of them; suppressing them keeps the 16 core tools (shell,
+# files, code-exec, search, web, memory, …) and makes every launch start fast and
+# quiet. Re-enable per box by editing this list if a browser/media tool is needed.
+agent:
+  disabled_toolsets:
+    - browser
+    - computer_use
+    - tts
+    - video
+    - video_gen
+    - image_gen
+    - vision
+    - spotify

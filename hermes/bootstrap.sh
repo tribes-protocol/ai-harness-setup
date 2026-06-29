@@ -45,21 +45,10 @@ else
   # daylight skin. Resolve the skin now and rewrite the file to ONLY the display
   # block (no raw __TRIBES_* survives; launch.sh re-seds the same `skin:` line).
   skin=$([ "$TRIBES_THEME" = light ] && echo daylight || echo default)
-  printf 'display:\n  skin: %s\n' "$skin" >/workspace/.hermes/config.yaml
-fi
-
-# --- pre-stage heavy first-run deps -----------------------------------------
-# On a fresh rootfs hermes self-installs its node TUI deps + Playwright Chromium
-# + apt X11/font/ffmpeg libs on its FIRST INTERACTIVE start. That storm runs for
-# minutes and, if it lands during the first real session, floods the terminal and
-# breaks the exit->bash->relaunch cycle (the sandboxd:validate exitToShell
-# failure). `hermes postinstall` performs exactly those installs ONCE, here,
-# non-interactively, BEFORE the dispatcher's interactive loop — so every launch
-# (first boot AND relaunch) starts fast and quiet. Bounded + tolerant: a slow or
-# failed pre-stage must NOT abort bootstrap, or the once-only marker is dropped
-# and the whole install re-runs on the next relaunch.
-if command -v hermes >/dev/null 2>&1; then
-  HERMES_DISABLE_LAZY_INSTALLS=1 timeout 600 hermes postinstall </dev/null >/dev/null 2>&1 || true
+  # Keep the same agent.disabled_toolsets suppression as the committed config (see
+  # config.yaml) so a BYO box also avoids the first-run browser/tts/media install
+  # storm that breaks exit->bash->relaunch.
+  printf 'display:\n  skin: %s\nagent:\n  disabled_toolsets:\n    - browser\n    - computer_use\n    - tts\n    - video\n    - video_gen\n    - image_gen\n    - vision\n    - spotify\n' "$skin" >/workspace/.hermes/config.yaml
 fi
 
 # --- safety net -------------------------------------------------------------
