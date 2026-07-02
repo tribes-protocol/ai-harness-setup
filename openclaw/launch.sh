@@ -15,5 +15,17 @@ if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
   sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
 fi
 
+# --- BYO onboarding ----------------------------------------------------------
+# In BYO mode bootstrap.sh deleted the proxy-seeded openclaw.json, and
+# `openclaw tui --local` then boots a normal-looking TUI on a default model
+# with NO credentials — no auth guidance, every message fails. On the first
+# BYO boot run `openclaw onboard` (interactive onboarding for credentials,
+# gateway, and workspace) so the user lands in setup; the /opt/tribes marker
+# keeps later relaunches out of the wizard (rerun anytime: `openclaw onboard`).
+if [ ! -f "$CFG" ] && [ ! -e /opt/tribes/.openclaw-onboard-offered ]; then
+  mkdir -p /opt/tribes && : > /opt/tribes/.openclaw-onboard-offered
+  openclaw onboard || true
+fi
+
 # `tui --local` opens the local agent TUI directly against the pre-seeded config.
 exec openclaw tui --local

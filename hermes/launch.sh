@@ -39,4 +39,19 @@ fi
 # need extra runtime deps are skipped — fine for a microVM agent.
 export HERMES_DISABLE_LAZY_INSTALLS=1
 
+# --- BYO onboarding: land on the setup wizard, not a bare [Y/n] prompt -------
+# In BYO mode (no proxy env) bootstrap.sh wrote a skin-only config — hermes has
+# no provider/key, and `hermes --yolo` parks on a plain "Hermes isn't configured
+# yet ... Run setup now? [Y/n]" text line. Launch `hermes setup` DIRECTLY on the
+# first BYO boot so the user lands in real onboarding (Nous OAuth quick setup /
+# bring-your-own-keys). The /opt/tribes marker keeps a user who backs out from
+# being re-trapped on every relaunch (they can rerun `hermes setup` anytime),
+# and a completed setup writes providers into config.yaml, which also skips.
+if [ -z "$TRIBES_API_KEY" ] \
+   && ! grep -q '^providers:' /workspace/.hermes/config.yaml 2>/dev/null \
+   && [ ! -e /opt/tribes/.hermes-setup-offered ]; then
+  mkdir -p /opt/tribes && : > /opt/tribes/.hermes-setup-offered
+  hermes setup || true
+fi
+
 exec hermes --yolo
