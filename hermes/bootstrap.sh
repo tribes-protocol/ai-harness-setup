@@ -48,6 +48,23 @@ if ! command -v hermes >/dev/null 2>&1; then
   script -qec \
     'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup --skip-browser' \
     /var/log/hermes-install.log >/dev/null 2>&1 || true
+
+  # --- post-install prune ----------------------------------------------------
+  # hermes installs HERE, on first boot, onto the VM's own disk (it is no longer
+  # pre-baked into the shared rootfs — the bake cost ~511MB on EVERY sandbox's
+  # disk, hermes or not). Trim the payload the running agent never reads — the
+  # cloned repo's git history/docs/tests, the musl twins of the glibc node
+  # bindings, venv bytecode, and the npm/uv install caches — ~180MB. Same list
+  # the old bake-time slim used; the boot path (venv + gnu bindings) is intact.
+  # Best-effort: a miss must never abort bootstrap.
+  if command -v hermes >/dev/null 2>&1; then
+    H=/usr/local/lib/hermes-agent
+    rm -rf "$H/.git" "$H/website" "$H/tests" "$H/apps/desktop" \
+           /workspace/.npm /workspace/.cache 2>/dev/null || true
+    find "$H/node_modules" -type d -name '*-musl' -prune -exec rm -rf {} + 2>/dev/null || true
+    find "$H/venv" -depth -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+    find "$H/venv" -type f -name '*.pyc' -delete 2>/dev/null || true
+  fi
 fi
 
 # --- seed the shared agent primer -------------------------------------------
