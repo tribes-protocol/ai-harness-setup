@@ -9,7 +9,11 @@
 set -e
 
 # --- install the harness binary ---------------------------------------------
-npm install -g --no-fund --no-audit @anthropic-ai/claude-code@latest || true
+# Gate on the binary already being present: sandbox rootfs images pre-install the
+# harness onto a shared read-only drive on PATH, so first boot skips the install
+# and writes only config (matches every other harness's bootstrap).
+command -v claude >/dev/null 2>&1 ||
+  npm install -g --no-fund --no-audit @anthropic-ai/claude-code@latest || true
 
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
