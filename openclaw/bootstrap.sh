@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenClaw harness bootstrap — runs ONCE on first boot, as root, cwd /workspace, sh.
+# OpenClaw harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
 # Installs the OpenClaw CLI and fills the committed seed config. OpenClaw is fully
 # FILE-based — there is no env-based config — so launch.sh just execs it. The two
 # committed files are .openclaw/exec-approvals.json (fully static yolo defaults)
@@ -14,9 +14,9 @@ command -v openclaw >/dev/null 2>&1 ||
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || true
+curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
-[ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
+[ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
 
 # --- proxy-routed config ----------------------------------------------------
 # Fill the committed seed .openclaw/openclaw.json placeholders. OpenClaw uses a
@@ -40,7 +40,7 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
   # slashes, braces and quotes) is injected verbatim — no sed-delimiter clash.
   # awk's gsub replacement treats `&` and `\` specially, so escape them in each
   # value first; the placeholders are then replaced literally and JSON stays valid.
-  cfg=/workspace/.openclaw/openclaw.json
+  cfg=/root/workspace/.openclaw/openclaw.json
   awk \
     -v proxy="$proxy" -v token="$token" \
     -v model="$TRIBES_LLM_MODEL" -v models="$claw_models" '
@@ -58,16 +58,16 @@ else
   # No proxy env (BYO key) — never leave raw placeholders on disk. Drop the
   # proxy-provider seed (keep the static exec-approvals.json); openclaw then
   # uses its own provider/creds.
-  rm -f /workspace/.openclaw/openclaw.json
+  rm -f /root/workspace/.openclaw/openclaw.json
 fi
 
 # --- safety net -------------------------------------------------------------
-# Belt-and-suspenders: no file under /workspace may survive with a raw
+# Belt-and-suspenders: no file under /root/workspace may survive with a raw
 # __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
 # __HOST__, so it is not matched.
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

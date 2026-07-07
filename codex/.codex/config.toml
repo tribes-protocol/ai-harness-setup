@@ -9,5 +9,5 @@ base_url = "__TRIBES_PROXY__"
 env_key = "OPENAI_API_KEY"
 wire_api = "responses"
 
-[projects."/workspace"]
+[projects."/root/workspace"]
 trust_level = "trusted"

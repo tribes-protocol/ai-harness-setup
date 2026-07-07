@@ -1,5 +1,5 @@
 #!/bin/sh
-# Cline harness launch — runs on EVERY launch, as root, cwd /workspace, sh.
+# Cline harness launch — runs on EVERY launch, as root, cwd /root/workspace, sh.
 # Cline's auth is a file the `cline auth` command writes (~/.cline/data/settings/
 # providers.json) — there is no committed seed config and no env-based config.
 

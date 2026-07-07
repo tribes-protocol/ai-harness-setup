@@ -1,5 +1,5 @@
 #!/bin/sh
-# claude harness — launch (runs EVERY launch, as root, cwd /workspace, under sh).
+# claude harness — launch (runs EVERY launch, as root, cwd /root/workspace, under sh).
 # Exports the ENV-based proxy config, then execs the harness. Env exports MUST
 # live here (not bootstrap.sh): only this process's env reaches the harness.
 

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Pi harness bootstrap — runs ONCE on first boot, as root, cwd /workspace, sh.
-# Pi is fully FILE-based: it reads /workspace/.pi/agent/{models,settings}.json,
+# Pi harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
+# Pi is fully FILE-based: it reads /root/workspace/.pi/agent/{models,settings}.json,
 # so there is NO env-based config to defer to launch.sh. The two config files are
 # COMMITTED real files (seed files) carrying placeholders; this script only fills
 # the handful of runtime values it can't commit (proxy base, token, default model,
@@ -15,9 +15,9 @@ command -v pi >/dev/null 2>&1 ||
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || true
+curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
-[ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
+[ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
 
 # --- proxy-routed config ----------------------------------------------------
 # Pi → an openai-completions provider declared in models.json. Pi does NOT
@@ -45,8 +45,8 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
     ' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
   }
 
-  m=/workspace/.pi/agent/models.json
-  s=/workspace/.pi/agent/settings.json
+  m=/root/workspace/.pi/agent/models.json
+  s=/root/workspace/.pi/agent/settings.json
   fill "$m" "__TRIBES_PROXY__" "$proxy"
   fill "$m" "__TRIBES_TOKEN__" "$token"
   fill "$m" "__TRIBES_MODELS__" "$pi_models"
@@ -57,8 +57,8 @@ else
   # settings.json carries "theme" (pi's Automatic mode = follow the terminal's
   # light/dark), which is independent of our proxy — KEEP it, but drop the now-dead
   # defaultProvider/defaultModel that referenced the absent tribes provider.
-  rm -f /workspace/.pi/agent/models.json
-  s=/workspace/.pi/agent/settings.json
+  rm -f /root/workspace/.pi/agent/models.json
+  s=/root/workspace/.pi/agent/settings.json
   [ -e "$s" ] && command -v bun >/dev/null 2>&1 &&
     bun -e '
       const f = process.argv[1];
@@ -70,12 +70,12 @@ else
 fi
 
 # --- safety net -------------------------------------------------------------
-# Belt-and-suspenders: no file under /workspace may survive with a raw
+# Belt-and-suspenders: no file under /root/workspace may survive with a raw
 # __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
 # __HOST__, so it is not matched.
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

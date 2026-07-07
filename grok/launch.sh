@@ -1,5 +1,5 @@
 #!/bin/sh
-# grok harness — launch (runs on EVERY launch, as root, cwd /workspace, under sh).
+# grok harness — launch (runs on EVERY launch, as root, cwd /root/workspace, under sh).
 # Rewrites the SEED config's theme from the create-time TRIBES_THEME, exports the
 # ENV-based proxy config (GROK_*), waits (bounded) for egress, then execs grok.
 
@@ -17,9 +17,9 @@
 # grok launch); fall back to the create-time TRIBES_THEME when that file is absent.
 theme="$(cat /run/tribes-theme 2>/dev/null)"
 [ "$theme" = light ] || [ "$theme" = dark ] || theme=$([ "$TRIBES_THEME" = light ] && echo light || echo dark)
-mkdir -p /workspace/.grok
-[ -e /workspace/.grok/config.toml ] || printf '[ui]\ntheme = "__TRIBES_THEME__"\n' > /workspace/.grok/config.toml
-sed -i "s|theme = \"[^\"]*\"|theme = \"$theme\"|" /workspace/.grok/config.toml
+mkdir -p /root/workspace/.grok
+[ -e /root/workspace/.grok/config.toml ] || printf '[ui]\ntheme = "__TRIBES_THEME__"\n' > /root/workspace/.grok/config.toml
+sed -i "s|theme = \"[^\"]*\"|theme = \"$theme\"|" /root/workspace/.grok/config.toml
 
 # --- proxy (ENV-only for grok) ----------------------------------------------
 # grok CLI → OpenAI chat surface via its base-url override. An existing session

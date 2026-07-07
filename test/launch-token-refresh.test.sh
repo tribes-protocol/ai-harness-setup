@@ -57,7 +57,7 @@ GNU_SED=0
 sed --version >/dev/null 2>&1 && GNU_SED=1
 
 # Run one file-based harness whose token lives in a config file we sed.
-#   $1 harness dir   $2 config path relative to /workspace
+#   $1 harness dir   $2 config path relative to /root/workspace
 run_file_harness() {
   h="$1"; cfgrel="$2"
   if [ "$GNU_SED" -ne 1 ]; then
@@ -70,8 +70,8 @@ run_file_harness() {
   # already filled to the OLD (revoked) token (what bootstrap.sh wrote at first
   # boot, now stale).
   sed "s|__TRIBES_TOKEN__|$OLD|g" "$REPO/$h/$cfgrel" > "$ws/$cfgrel"
-  # Point the launch copy's hard-coded /workspace at our temp workspace.
-  sed "s|/workspace|$ws|g" "$REPO/$h/launch.sh" > "$TMP/$h-launch.sh"
+  # Point the launch copy's hard-coded /root/workspace at our temp workspace.
+  sed "s|/root/workspace|$ws|g" "$REPO/$h/launch.sh" > "$TMP/$h-launch.sh"
 
   PATH="$STUB:$PATH" \
     TRIBES_API_KEY="$NEW" API_BASE_URL="https://api.example" \
@@ -93,7 +93,7 @@ run_file_harness hermes  ".hermes/config.yaml"
 # cline: the token is written by `cline auth --apikey <token>`, which launch.sh
 # must run every boot. Assert it re-auths with the LIVE key on restore.
 ws="$TMP/cline/workspace"; mkdir -p "$ws"
-sed "s|/workspace|$ws|g" "$REPO/cline/launch.sh" > "$TMP/cline-launch.sh"
+sed "s|/root/workspace|$ws|g" "$REPO/cline/launch.sh" > "$TMP/cline-launch.sh"
 PATH="$STUB:$PATH" \
   TRIBES_API_KEY="$NEW" API_BASE_URL="https://api.example" \
   TRIBES_LLM_MODEL="m" \

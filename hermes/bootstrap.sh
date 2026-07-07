@@ -1,7 +1,7 @@
 #!/bin/sh
-# Hermes harness bootstrap — runs ONCE on first boot, as root, cwd /workspace, sh.
+# Hermes harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
 # Installs the Hermes CLI, then fills the placeholders in the COMMITTED seed config
-# /workspace/.hermes/config.yaml. Hermes is fully FILE-based: it reads
+# /root/workspace/.hermes/config.yaml. Hermes is fully FILE-based: it reads
 # model/provider/skin from that file, so there is NO env-based config to defer to
 # launch.sh. launch.sh re-seds the display.skin line each launch so a theme toggle
 # takes effect on relaunch.
@@ -60,7 +60,7 @@ if ! command -v hermes >/dev/null 2>&1; then
   if command -v hermes >/dev/null 2>&1; then
     H=/usr/local/lib/hermes-agent
     rm -rf "$H/.git" "$H/website" "$H/tests" "$H/apps/desktop" \
-           /workspace/.npm /workspace/.cache 2>/dev/null || true
+           /root/workspace/.npm /root/workspace/.cache 2>/dev/null || true
     find "$H/node_modules" -type d -name '*-musl' -prune -exec rm -rf {} + 2>/dev/null || true
     find "$H/venv" -depth -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
     find "$H/venv" -type f -name '*.pyc' -delete 2>/dev/null || true
@@ -70,9 +70,9 @@ fi
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || true
+curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
-[ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
+[ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
 
 # --- proxy-routed config ----------------------------------------------------
 # Fill the seed config's placeholders. Hermes declares a user `tribes` provider in
@@ -83,14 +83,14 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # discovers the full catalog from the proxy's GET /models; model.default preselects
 # ours. Skip gracefully if the proxy env is absent (CLI falls back to user creds).
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
-  sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" /workspace/.hermes/config.yaml
-  sed -i "s|__TRIBES_TOKEN__|$TRIBES_API_KEY|g" /workspace/.hermes/config.yaml
-  sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" /workspace/.hermes/config.yaml
+  sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" /root/workspace/.hermes/config.yaml
+  sed -i "s|__TRIBES_TOKEN__|$TRIBES_API_KEY|g" /root/workspace/.hermes/config.yaml
+  sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" /root/workspace/.hermes/config.yaml
   # Resolve the create-time skin now so no __TRIBES_SKIN__ placeholder reaches the
   # safety net below (launch.sh still re-seds the generic `skin:` line each launch
   # so a later theme toggle takes effect on relaunch).
   skin=$([ "$TRIBES_THEME" = light ] && echo daylight || echo default)
-  sed -i "s|^  skin:.*|  skin: $skin|" /workspace/.hermes/config.yaml
+  sed -i "s|^  skin:.*|  skin: $skin|" /root/workspace/.hermes/config.yaml
 else
   # No proxy env (BYO key) — drop the model:/providers: blocks so hermes falls back
   # to its built-in Nous provider/OAuth, but KEEP a skin-only display block: the
@@ -98,16 +98,16 @@ else
   # daylight skin. Resolve the skin now and rewrite the file to ONLY the display
   # block (no raw __TRIBES_* survives; launch.sh re-seds the same `skin:` line).
   skin=$([ "$TRIBES_THEME" = light ] && echo daylight || echo default)
-  printf 'display:\n  skin: %s\n' "$skin" >/workspace/.hermes/config.yaml
+  printf 'display:\n  skin: %s\n' "$skin" >/root/workspace/.hermes/config.yaml
 fi
 
 # --- safety net -------------------------------------------------------------
-# Belt-and-suspenders: no file under /workspace may survive with a raw
+# Belt-and-suspenders: no file under /root/workspace may survive with a raw
 # __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
 # __HOST__, so it is not matched.
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done
