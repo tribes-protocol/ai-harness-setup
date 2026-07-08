@@ -3,6 +3,8 @@
 # Installs the Codex CLI and fills the committed seed config (.codex/config.toml)
 # with the runtime proxy + model. Env-based config (OPENAI_API_KEY) is set in
 # launch.sh, because exports from this process are lost before the harness launches.
+# Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace,
+# new: /root).
 set -e
 
 # --- install ----------------------------------------------------------------
@@ -29,12 +31,12 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 #      __TRIBES_* placeholders survive either way.
 # Done with `bun` (smol-toml) for a robust structured edit, not fragile sed.
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
-  sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" /root/workspace/.codex/config.toml
-  sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" /root/workspace/.codex/config.toml
-elif [ -e /root/workspace/.codex/config.toml ]; then
+  sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" "$HOME/.codex/config.toml"
+  sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" "$HOME/.codex/config.toml"
+elif [ -e "$HOME/.codex/config.toml" ]; then
   # Preferred: structured edit via bun + smol-toml (robust to whitespace/order).
   ( cd /root/workspace && bun add --silent smol-toml >/dev/null 2>&1 || true )
-  TOML_PATH=/root/workspace/.codex/config.toml bun -e '
+  TOML_PATH="$HOME/.codex/config.toml" bun -e '
     import { parse, stringify } from "smol-toml";
     const p = process.env.TOML_PATH;
     const cfg = parse(await Bun.file(p).text());
@@ -47,7 +49,7 @@ elif [ -e /root/workspace/.codex/config.toml ]; then
   # unavailable offline), strip the proxy bits with awk so the safety net below
   # does not nuke the whole file and lose the trust/yolo settings. Drops the
   # top-level model/model_provider keys and the [model_providers.*] table.
-  if grep -q "__TRIBES_" /root/workspace/.codex/config.toml 2>/dev/null; then
+  if grep -q "__TRIBES_" "$HOME/.codex/config.toml" 2>/dev/null; then
     awk '
       /^[[:space:]]*\[model_providers/ { skip=1; next }
       /^[[:space:]]*\[/               { skip=0 }
@@ -55,8 +57,8 @@ elif [ -e /root/workspace/.codex/config.toml ]; then
       /^[[:space:]]*model[[:space:]]*=/          { next }
       /^[[:space:]]*model_provider[[:space:]]*=/ { next }
       { print }
-    ' /root/workspace/.codex/config.toml > /root/workspace/.codex/config.toml.tmp &&
-      mv /root/workspace/.codex/config.toml.tmp /root/workspace/.codex/config.toml
+    ' "$HOME/.codex/config.toml" > "$HOME/.codex/config.toml.tmp" &&
+      mv "$HOME/.codex/config.toml.tmp" "$HOME/.codex/config.toml"
   fi
 fi
 
@@ -67,6 +69,6 @@ fi
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace "$HOME/.codex" 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

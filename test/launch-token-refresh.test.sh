@@ -57,28 +57,28 @@ GNU_SED=0
 sed --version >/dev/null 2>&1 && GNU_SED=1
 
 # Run one file-based harness whose token lives in a config file we sed.
-#   $1 harness dir   $2 config path relative to /root/workspace
+# Config paths in launch.sh are $HOME-relative (the dispatcher decides HOME), so
+# this test points HOME at a throwaway sandbox dir instead of rewriting the script.
+#   $1 harness dir   $2 config path relative to $HOME
 run_file_harness() {
   h="$1"; cfgrel="$2"
   if [ "$GNU_SED" -ne 1 ]; then
     skip "$h: needs GNU sed to validate launch.sh's in-place token rewrite"
     return
   fi
-  ws="$TMP/$h/workspace"
-  mkdir -p "$ws/$(dirname "$cfgrel")"
+  home="$TMP/$h/home"
+  mkdir -p "$home/$(dirname "$cfgrel")"
   # Simulate a restored disk: the committed seed with its token placeholder
   # already filled to the OLD (revoked) token (what bootstrap.sh wrote at first
   # boot, now stale).
-  sed "s|__TRIBES_TOKEN__|$OLD|g" "$REPO/$h/$cfgrel" > "$ws/$cfgrel"
-  # Point the launch copy's hard-coded /root/workspace at our temp workspace.
-  sed "s|/root/workspace|$ws|g" "$REPO/$h/launch.sh" > "$TMP/$h-launch.sh"
+  sed "s|__TRIBES_TOKEN__|$OLD|g" "$REPO/$h/$cfgrel" > "$home/$cfgrel"
 
-  PATH="$STUB:$PATH" \
+  HOME="$home" PATH="$STUB:$PATH" \
     TRIBES_API_KEY="$NEW" API_BASE_URL="https://api.example" \
     TRIBES_LLM_MODEL="m" TRIBES_THEME="dark" \
-    sh "$TMP/$h-launch.sh" >/dev/null 2>&1 || true
+    sh "$REPO/$h/launch.sh" >/dev/null 2>&1 || true
 
-  if grep -q "$NEW" "$ws/$cfgrel" && ! grep -q "$OLD" "$ws/$cfgrel"; then
+  if grep -q "$NEW" "$home/$cfgrel" && ! grep -q "$OLD" "$home/$cfgrel"; then
     pass "$h: launch.sh refreshed the on-disk token to the live key"
   else
     fail "$h: on-disk token NOT refreshed (still revoked) — restored box would 401"

@@ -1,10 +1,11 @@
 #!/bin/sh
 # Hermes harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
 # Installs the Hermes CLI, then fills the placeholders in the COMMITTED seed config
-# /root/workspace/.hermes/config.yaml. Hermes is fully FILE-based: it reads
+# $HOME/.hermes/config.yaml. Hermes is fully FILE-based: it reads
 # model/provider/skin from that file, so there is NO env-based config to defer to
 # launch.sh. launch.sh re-seds the display.skin line each launch so a theme toggle
-# takes effect on relaunch.
+# takes effect on relaunch. Config paths are $HOME-relative — the dispatcher
+# decides HOME (old: workspace, new: /root).
 set -e
 
 # --- install ----------------------------------------------------------------
@@ -60,7 +61,7 @@ if ! command -v hermes >/dev/null 2>&1; then
   if command -v hermes >/dev/null 2>&1; then
     H=/usr/local/lib/hermes-agent
     rm -rf "$H/.git" "$H/website" "$H/tests" "$H/apps/desktop" \
-           /root/workspace/.npm /root/workspace/.cache 2>/dev/null || true
+           "$HOME/.npm" "$HOME/.cache" 2>/dev/null || true
     find "$H/node_modules" -type d -name '*-musl' -prune -exec rm -rf {} + 2>/dev/null || true
     find "$H/venv" -depth -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
     find "$H/venv" -type f -name '*.pyc' -delete 2>/dev/null || true
@@ -83,14 +84,14 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # discovers the full catalog from the proxy's GET /models; model.default preselects
 # ours. Skip gracefully if the proxy env is absent (CLI falls back to user creds).
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
-  sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" /root/workspace/.hermes/config.yaml
-  sed -i "s|__TRIBES_TOKEN__|$TRIBES_API_KEY|g" /root/workspace/.hermes/config.yaml
-  sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" /root/workspace/.hermes/config.yaml
+  sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" "$HOME/.hermes/config.yaml"
+  sed -i "s|__TRIBES_TOKEN__|$TRIBES_API_KEY|g" "$HOME/.hermes/config.yaml"
+  sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" "$HOME/.hermes/config.yaml"
   # Resolve the create-time skin now so no __TRIBES_SKIN__ placeholder reaches the
   # safety net below (launch.sh still re-seds the generic `skin:` line each launch
   # so a later theme toggle takes effect on relaunch).
   skin=$([ "$TRIBES_THEME" = light ] && echo daylight || echo default)
-  sed -i "s|^  skin:.*|  skin: $skin|" /root/workspace/.hermes/config.yaml
+  sed -i "s|^  skin:.*|  skin: $skin|" "$HOME/.hermes/config.yaml"
 else
   # No proxy env (BYO key) — drop the model:/providers: blocks so hermes falls back
   # to its built-in Nous provider/OAuth, but KEEP a skin-only display block: the
@@ -98,7 +99,7 @@ else
   # daylight skin. Resolve the skin now and rewrite the file to ONLY the display
   # block (no raw __TRIBES_* survives; launch.sh re-seds the same `skin:` line).
   skin=$([ "$TRIBES_THEME" = light ] && echo daylight || echo default)
-  printf 'display:\n  skin: %s\n' "$skin" >/root/workspace/.hermes/config.yaml
+  printf 'display:\n  skin: %s\n' "$skin" >"$HOME/.hermes/config.yaml"
 fi
 
 # --- safety net -------------------------------------------------------------
@@ -108,6 +109,6 @@ fi
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace "$HOME/.hermes" 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

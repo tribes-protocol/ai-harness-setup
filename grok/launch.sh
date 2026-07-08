@@ -15,11 +15,13 @@
 # Prefer the LIVE theme the in-VM bridge writes to /run/tribes-theme on every
 # browser theme frame (so a mid-session light/dark TOGGLE takes effect on the next
 # grok launch); fall back to the create-time TRIBES_THEME when that file is absent.
+# Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace,
+# new: /root).
 theme="$(cat /run/tribes-theme 2>/dev/null)"
 [ "$theme" = light ] || [ "$theme" = dark ] || theme=$([ "$TRIBES_THEME" = light ] && echo light || echo dark)
-mkdir -p /root/workspace/.grok
-[ -e /root/workspace/.grok/config.toml ] || printf '[ui]\ntheme = "__TRIBES_THEME__"\n' > /root/workspace/.grok/config.toml
-sed -i "s|theme = \"[^\"]*\"|theme = \"$theme\"|" /root/workspace/.grok/config.toml
+mkdir -p "$HOME/.grok"
+[ -e "$HOME/.grok/config.toml" ] || printf '[ui]\ntheme = "__TRIBES_THEME__"\n' > "$HOME/.grok/config.toml"
+sed -i "s|theme = \"[^\"]*\"|theme = \"$theme\"|" "$HOME/.grok/config.toml"
 
 # --- proxy (ENV-only for grok) ----------------------------------------------
 # grok CLI → OpenAI chat surface via its base-url override. An existing session

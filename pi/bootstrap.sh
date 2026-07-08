@@ -1,11 +1,12 @@
 #!/bin/sh
 # Pi harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
-# Pi is fully FILE-based: it reads /root/workspace/.pi/agent/{models,settings}.json,
+# Pi is fully FILE-based: it reads $HOME/.pi/agent/{models,settings}.json,
 # so there is NO env-based config to defer to launch.sh. The two config files are
 # COMMITTED real files (seed files) carrying placeholders; this script only fills
 # the handful of runtime values it can't commit (proxy base, token, default model,
 # and the live model catalog). Skip the proxy fill gracefully when the proxy env
-# is absent (the CLI then falls back to the user's own creds).
+# is absent (the CLI then falls back to the user's own creds). Config paths are
+# $HOME-relative — the dispatcher decides HOME (old: workspace, new: /root).
 set -e
 
 # --- install ----------------------------------------------------------------
@@ -45,8 +46,8 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
     ' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
   }
 
-  m=/root/workspace/.pi/agent/models.json
-  s=/root/workspace/.pi/agent/settings.json
+  m="$HOME/.pi/agent/models.json"
+  s="$HOME/.pi/agent/settings.json"
   fill "$m" "__TRIBES_PROXY__" "$proxy"
   fill "$m" "__TRIBES_TOKEN__" "$token"
   fill "$m" "__TRIBES_MODELS__" "$pi_models"
@@ -57,8 +58,8 @@ else
   # settings.json carries "theme" (pi's Automatic mode = follow the terminal's
   # light/dark), which is independent of our proxy — KEEP it, but drop the now-dead
   # defaultProvider/defaultModel that referenced the absent tribes provider.
-  rm -f /root/workspace/.pi/agent/models.json
-  s=/root/workspace/.pi/agent/settings.json
+  rm -f "$HOME/.pi/agent/models.json"
+  s="$HOME/.pi/agent/settings.json"
   [ -e "$s" ] && command -v bun >/dev/null 2>&1 &&
     bun -e '
       const f = process.argv[1];
@@ -76,6 +77,6 @@ fi
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace "$HOME/.pi" 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

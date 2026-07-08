@@ -10,7 +10,8 @@
 export NO_OPEN_BROWSER=1
 
 # bootstrap.sh symlinked the binary to /usr/local/bin; keep the installer's own
-# bin dir (HOME is /root/workspace) on PATH too as a fallback.
+# bin dir (pinned to /root/workspace at install time, regardless of the
+# dispatcher's HOME) on PATH too as a fallback.
 export PATH="/root/workspace/.local/bin:$PATH"
 
 exec agent

@@ -6,6 +6,8 @@
 # create-time TRIBES_THEME so the file is valid (no raw placeholder) and survives
 # the end-of-bootstrap safety net. launch.sh re-seds it each launch so a theme
 # toggle takes effect on relaunch. grok's proxy is ENV-only (GROK_* vars), in launch.sh.
+# Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace,
+# new: /root).
 
 set -e
 
@@ -20,8 +22,8 @@ fi
 # the create-time theme so the committed file ends up CONCRETE (light/dark) — no
 # raw placeholder left for the safety net below to delete. Default dark.
 theme=$([ "$TRIBES_THEME" = light ] && echo light || echo dark)
-if [ -e /root/workspace/.grok/config.toml ]; then
-  sed -i "s|__TRIBES_THEME__|$theme|g" /root/workspace/.grok/config.toml
+if [ -e "$HOME/.grok/config.toml" ]; then
+  sed -i "s|__TRIBES_THEME__|$theme|g" "$HOME/.grok/config.toml"
 fi
 
 # --- seed the shared agent primer -------------------------------------------
@@ -40,6 +42,6 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace "$HOME/.grok" 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

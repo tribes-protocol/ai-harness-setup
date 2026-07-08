@@ -13,7 +13,9 @@
 # and the proxy 401s ("lost LLM key"). launch.sh runs EVERY boot with the live
 # cmdline env, so re-point the on-disk apiKey at the current token here. No-op on a
 # cold boot (already current); skipped on BYO/unset (file removed, or no key).
-CFG=/root/workspace/.pi/agent/models.json
+# Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace,
+# new: /root).
+CFG="$HOME/.pi/agent/models.json"
 if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
   sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
 fi
