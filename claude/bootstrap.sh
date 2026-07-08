@@ -4,8 +4,12 @@
 # FILE-based config (.claude.json trust file, .claude/settings.json) ships as
 # committed real files in this harness dir, copied verbatim into /root/workspace by
 # the dispatcher, then relocated to $HOME (old dispatcher: stays in the workspace;
-# new dispatcher: moves to /root) — there is nothing to generate here. The proxy
-# is ENV-only for claude (ANTHROPIC_*), configured in launch.sh.
+# new dispatcher: moves to /root). settings.json's "env" block carries the proxy
+# config (ANTHROPIC_BASE_URL/AUTH_TOKEN/MODEL) filled below — this is what a
+# MANUALLY-typed `claude` in the exit shell reads, since launch.sh's own `export`s
+# die with the harness process and never reach that shell. launch.sh still
+# exports the same values too (belt-and-suspenders for the auto-launched harness)
+# and refreshes the on-disk token every launch (restore-safety).
 
 set -e
 
@@ -25,11 +29,59 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # claude also reads CLAUDE.md — give it the same primer.
 [ -e /root/workspace/AGENTS.md ] && cp /root/workspace/AGENTS.md /root/workspace/CLAUDE.md
 
+# --- proxy config (settings.json "env" block) -------------------------------
+# Proxy present  → fill the three placeholders so settings.json's env block is a
+#      real, working gateway config claude reads on EVERY invocation (launched OR
+#      manually typed in the exit shell). Filled via awk literal gsub (NOT sed) so
+#      the proxy URL/token — which may contain '/', '&', or other regex/
+#      replacement metacharacters — are inserted verbatim and the result stays
+#      valid JSON (mirrors pi/bootstrap.sh's fill()).
+# BYO (proxy env unset) → strip the WHOLE "env" key so claude falls back to the
+#      user's own login/key with zero leftover proxy creds and zero raw
+#      __TRIBES_* placeholders. Structured edit via bun (always present on the
+#      sandbox rootfs, unlike node/npm) so theme/skipDangerousModePermissionPrompt
+#      survive untouched; falls back to an awk line-range delete if bun is
+#      somehow unavailable. settings.json commits "env" as the FIRST key
+#      specifically so that fallback's line range (open brace to matching close)
+#      is unambiguous.
+CFG="$HOME/.claude/settings.json"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ] && [ -e "$CFG" ]; then
+  fill() {
+    # fill <file> <placeholder> <value>
+    awk -v ph="$2" -v val="$3" '
+      { while ((i = index($0, ph)) > 0)
+          $0 = substr($0, 1, i - 1) val substr($0, i + length(ph))
+        print }
+    ' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+  }
+  fill "$CFG" "__TRIBES_PROXY__" "${API_BASE_URL}/llm/proxy"
+  fill "$CFG" "__TRIBES_TOKEN__" "$TRIBES_API_KEY"
+  fill "$CFG" "__TRIBES_MODEL__" "$TRIBES_LLM_MODEL"
+elif [ -e "$CFG" ]; then
+  command -v bun >/dev/null 2>&1 && bun -e '
+    const f = process.argv[1];
+    const s = require(f);
+    delete s.env;
+    require("fs").writeFileSync(f, JSON.stringify(s));
+  ' "$CFG" || true
+  # Fallback: if a raw __TRIBES_ placeholder survived (e.g. bun unavailable),
+  # delete the "env": { ... } block by line range so the safety net below does
+  # not nuke the whole file and lose theme/skipDangerousModePermissionPrompt.
+  if grep -q "__TRIBES_" "$CFG" 2>/dev/null; then
+    awk '
+      /^[[:space:]]*"env": \{/ { skip=1; next }
+      skip && /^[[:space:]]*\},?[[:space:]]*$/ { skip=0; next }
+      skip { next }
+      { print }
+    ' "$CFG" > "$CFG.tmp" &&
+      mv "$CFG.tmp" "$CFG"
+  fi
+fi
+
 # --- safety net -------------------------------------------------------------
 # Belt-and-suspenders: no file under /root/workspace may survive with a raw
-# __TRIBES_* placeholder. claude config is fully static (no placeholders) and the
-# proxy is ENV-only in launch.sh, so this is a no-op guard. AGENTS.md/CLAUDE.md
-# only carry __HOST__, so they are not matched.
+# __TRIBES_* placeholder. AGENTS.md/CLAUDE.md only carry __HOST__, so they are
+# not matched.
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.

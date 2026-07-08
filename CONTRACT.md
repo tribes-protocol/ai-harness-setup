@@ -104,8 +104,20 @@ fi
 
 `cline` (whose token lives in a binary-managed provider file) instead re-runs its
 `cline auth ...` command in `launch.sh` every boot. **env-based** harnesses
-(`claude`/`codex`/`grok`) already export the live `TRIBES_API_KEY` each launch, so
-they are restore-safe by construction. Covered by `test/launch-token-refresh.test.sh`.
+(`codex`/`grok`) already export the live `TRIBES_API_KEY` each launch, so the
+LAUNCHED harness is restore-safe by construction — but that export dies with
+`launch.sh`'s process and is invisible to a manual invocation of the harness
+binary typed later in the dispatcher's exit shell (a real, supported access
+path). `claude` is a **hybrid**: `launch.sh` still exports `ANTHROPIC_*` for the
+launched harness (belt-and-suspenders), but the credential that actually matters
+for manual use lives in `.claude/settings.json`'s `env` block — a file Claude
+Code itself reads on *every* invocation, launched or manually typed, regardless
+of shell. That file gets the exact same bootstrap-fill / launch-refresh /
+BYO-strip treatment as any other file-based harness above. A harness whose
+binary can plausibly be invoked by hand from the exit shell should prefer this
+settings-file idiom over a bare env export for that reason; `codex`/`grok` have
+the same latent gap for manual invocation (tracked separately — out of scope
+here). Covered by `test/launch-token-refresh.test.sh`.
 
 ## Env vars available at runtime (injected by the control plane)
 
