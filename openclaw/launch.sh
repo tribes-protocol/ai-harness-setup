@@ -10,7 +10,9 @@
 # the OLD, now-revoked token — so openclaw would 401 against the proxy. launch.sh
 # runs EVERY boot with the live env, so re-point the on-disk apiKey at the current
 # token here. No-op on a cold boot; skipped on BYO/unset (file removed, or no key).
-CFG=/root/workspace/.openclaw/openclaw.json
+# Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace,
+# new: /root).
+CFG="$HOME/.openclaw/openclaw.json"
 if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
   sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
 fi

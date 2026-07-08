@@ -4,7 +4,8 @@
 # FILE-based — there is no env-based config — so launch.sh just execs it. The two
 # committed files are .openclaw/exec-approvals.json (fully static yolo defaults)
 # and .openclaw/openclaw.json (proxy provider + the live model catalog), the
-# latter carrying placeholders this script fills.
+# latter carrying placeholders this script fills. Config paths are $HOME-relative
+# — the dispatcher decides HOME (old: workspace, new: /root).
 set -e
 
 # --- install ----------------------------------------------------------------
@@ -40,7 +41,7 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
   # slashes, braces and quotes) is injected verbatim — no sed-delimiter clash.
   # awk's gsub replacement treats `&` and `\` specially, so escape them in each
   # value first; the placeholders are then replaced literally and JSON stays valid.
-  cfg=/root/workspace/.openclaw/openclaw.json
+  cfg="$HOME/.openclaw/openclaw.json"
   awk \
     -v proxy="$proxy" -v token="$token" \
     -v model="$TRIBES_LLM_MODEL" -v models="$claw_models" '
@@ -58,7 +59,7 @@ else
   # No proxy env (BYO key) — never leave raw placeholders on disk. Drop the
   # proxy-provider seed (keep the static exec-approvals.json); openclaw then
   # uses its own provider/creds.
-  rm -f /root/workspace/.openclaw/openclaw.json
+  rm -f "$HOME/.openclaw/openclaw.json"
 fi
 
 # --- safety net -------------------------------------------------------------
@@ -68,6 +69,6 @@ fi
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace "$HOME/.openclaw" 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

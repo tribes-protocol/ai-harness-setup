@@ -6,16 +6,22 @@
 # (in-TUI `/login`, or CURSOR_API_KEY). The non-interactive config
 # (.cursor/cli-config.json: approvalMode unrestricted + cursor's own sandbox
 # disabled — the microVM is the security boundary) ships as a committed real
-# file in this harness dir, copied verbatim into /root/workspace by the dispatcher.
+# file in this harness dir, copied verbatim into /root/workspace by the dispatcher,
+# then — like every other harness's dot-config — relocated to $HOME (the
+# dispatcher decides HOME: old dispatcher leaves it in the workspace, new
+# dispatcher moves it to /root). cursor-agent reads its config from the actual
+# HOME env var at runtime, so no path in this script needs to know which.
 set -e
 
 # --- install the harness binary ---------------------------------------------
 # The official installer unpacks a self-contained build under
 # $HOME/.local/share/cursor-agent and symlinks `agent` into $HOME/.local/bin —
-# no root or Node needed. Pin HOME=/root/workspace so the install lands on the
-# persistent workspace disk (HOME at launch time) whatever env the dispatcher
-# ran us with. /root/workspace/.local/bin is not on the dispatcher's PATH, so also
-# expose the entry symlink at /usr/local/bin, which always is.
+# no root or Node needed. Pin HOME=/root/workspace for the INSTALL regardless of
+# what HOME the dispatcher runs this script with, so the binary always lands on
+# the persistent workspace disk (.local/ is never relocated by the dispatcher —
+# only the dot-config dirs are). /root/workspace/.local/bin is not on the
+# dispatcher's PATH, so also expose the entry symlink at /usr/local/bin, which
+# always is.
 command -v agent >/dev/null 2>&1 ||
   curl -fsS https://cursor.com/install | HOME=/root/workspace bash || true
 [ -x /root/workspace/.local/bin/agent ] &&

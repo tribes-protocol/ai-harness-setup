@@ -3,8 +3,9 @@
 # Installs the Claude Code binary and stamps the host into the primer. All
 # FILE-based config (.claude.json trust file, .claude/settings.json) ships as
 # committed real files in this harness dir, copied verbatim into /root/workspace by
-# the dispatcher — there is nothing to generate here. The proxy is ENV-only for
-# claude (ANTHROPIC_*), configured in launch.sh.
+# the dispatcher, then relocated to $HOME (old dispatcher: stays in the workspace;
+# new dispatcher: moves to /root) — there is nothing to generate here. The proxy
+# is ENV-only for claude (ANTHROPIC_*), configured in launch.sh.
 
 set -e
 
@@ -32,6 +33,6 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace "$HOME/.claude.json" "$HOME/.claude" 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

@@ -1,11 +1,12 @@
 #!/bin/sh
 # opencode harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
 # Installs the opencode CLI and fills the SEEDED file-based config
-# (/root/workspace/.config/opencode/opencode.json, copied verbatim from this harness
+# ($HOME/.config/opencode/opencode.json, copied verbatim from this harness
 # dir with __...__ placeholders): the yolo permission, theme, and the proxy
 # provider with the embedded model catalog.
 # opencode config is entirely FILE-based — theme:"system" follows the terminal —
-# so launch.sh just execs it; there is nothing to export per launch.
+# so launch.sh just execs it; there is nothing to export per launch. Config paths
+# are $HOME-relative — the dispatcher decides HOME (old: workspace, new: /root).
 set -e
 
 # --- install ----------------------------------------------------------------
@@ -30,8 +31,8 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # So fetch the catalog from the proxy's GET /models and embed it as the models
 # map (like pi). If the fetch is empty (boot-time hiccup), declare at least the
 # default model so the preselected `model` still resolves.
-CFG=/root/workspace/.config/opencode/opencode.json
-mkdir -p /root/workspace/.config/opencode
+CFG="$HOME/.config/opencode/opencode.json"
+mkdir -p "$HOME/.config/opencode"
 
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ] && [ -e "$CFG" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
@@ -81,6 +82,6 @@ fi
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace "$HOME/.config/opencode" 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done
