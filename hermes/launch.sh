@@ -1,5 +1,5 @@
 #!/bin/sh
-# Hermes harness launch — runs on EVERY launch, as root, cwd /workspace, sh.
+# Hermes harness launch — runs on EVERY launch, as root, cwd /root/workspace, sh.
 # Hermes is fully FILE-based (config.yaml), so there is NO env-based config to
 # export here. We re-sed the display.skin line from the CURRENT theme so a
 # TRIBES_THEME toggle takes effect on relaunch. The ^  skin: anchor matches both
@@ -9,9 +9,9 @@
 # The ^  skin: line is present in BOTH configs bootstrap.sh can produce: the full
 # proxy config and the BYO skin-only config (display block only). Guard on [ -f ]
 # anyway so a missing file never makes sed -i create/break one.
-if [ -f /workspace/.hermes/config.yaml ]; then
+if [ -f /root/workspace/.hermes/config.yaml ]; then
   skin=$([ "$TRIBES_THEME" = light ] && echo daylight || echo default)
-  sed -i "s|^  skin:.*|  skin: $skin|" /workspace/.hermes/config.yaml
+  sed -i "s|^  skin:.*|  skin: $skin|" /root/workspace/.hermes/config.yaml
 fi
 
 # --- restore-safety: refresh the proxy token from the LIVE env --------------
@@ -21,8 +21,8 @@ fi
 # holds the OLD, now-revoked token — so hermes would 401 against the proxy.
 # launch.sh runs EVERY boot with the live env, so re-point the on-disk api_key at
 # the current token here. No-op on a cold boot; skipped on BYO/unset.
-if [ -n "$TRIBES_API_KEY" ] && [ -f /workspace/.hermes/config.yaml ]; then
-  sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" /workspace/.hermes/config.yaml
+if [ -n "$TRIBES_API_KEY" ] && [ -f /root/workspace/.hermes/config.yaml ]; then
+  sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" /root/workspace/.hermes/config.yaml
 fi
 
 # --- seal the venv against banner-time lazy installs ------------------------
@@ -48,7 +48,7 @@ export HERMES_DISABLE_LAZY_INSTALLS=1
 # being re-trapped on every relaunch (they can rerun `hermes setup` anytime),
 # and a completed setup writes providers into config.yaml, which also skips.
 if [ -z "$TRIBES_API_KEY" ] \
-   && ! grep -q '^providers:' /workspace/.hermes/config.yaml 2>/dev/null \
+   && ! grep -q '^providers:' /root/workspace/.hermes/config.yaml 2>/dev/null \
    && [ ! -e /opt/tribes/.hermes-setup-offered ]; then
   mkdir -p /opt/tribes && : > /opt/tribes/.hermes-setup-offered
   hermes setup || true

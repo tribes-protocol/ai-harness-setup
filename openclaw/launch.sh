@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenClaw harness launch — runs on EVERY launch, as root, cwd /workspace, sh.
+# OpenClaw harness launch — runs on EVERY launch, as root, cwd /root/workspace, sh.
 # OpenClaw config is entirely FILE-based (exec-approvals.json + openclaw.json,
 # written by bootstrap.sh) — there is no env-based config and no theme knob.
 
@@ -10,7 +10,7 @@
 # the OLD, now-revoked token — so openclaw would 401 against the proxy. launch.sh
 # runs EVERY boot with the live env, so re-point the on-disk apiKey at the current
 # token here. No-op on a cold boot; skipped on BYO/unset (file removed, or no key).
-CFG=/workspace/.openclaw/openclaw.json
+CFG=/root/workspace/.openclaw/openclaw.json
 if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
   sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
 fi

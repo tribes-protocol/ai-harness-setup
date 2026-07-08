@@ -1,5 +1,5 @@
 #!/bin/sh
-# Cline harness bootstrap — runs ONCE on first boot, as root, cwd /workspace, sh.
+# Cline harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
 #
 # WHY NO COMMITTED SEED CONFIG (cline is the contract's documented exception):
 # Every other harness commits a real, version-controlled config file with
@@ -24,9 +24,9 @@ command -v cline >/dev/null 2>&1 ||
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || true
+curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
-[ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
+[ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
 
 # --- proxy-routed config: see launch.sh -------------------------------------
 # The `cline auth openai-compatible ...` command that writes cline's provider
@@ -35,13 +35,13 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # (running it once here would leave a restored box authed with the revoked key).
 
 # --- safety net -------------------------------------------------------------
-# Belt-and-suspenders: no file under /workspace may survive with a raw
+# Belt-and-suspenders: no file under /root/workspace may survive with a raw
 # __TRIBES_* placeholder. cline has no committed seed config (auth is a runtime
 # command), so this is a no-op guard. AGENTS.md only carries __HOST__, so it is
 # not matched.
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

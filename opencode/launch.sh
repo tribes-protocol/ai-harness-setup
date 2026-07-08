@@ -1,5 +1,5 @@
 #!/bin/sh
-# opencode harness launch — runs on EVERY launch, as root, cwd /workspace, sh.
+# opencode harness launch — runs on EVERY launch, as root, cwd /root/workspace, sh.
 # opencode config is entirely FILE-based (opencode.json, written by bootstrap.sh)
 # — there is no env-based config, and theme:"system" makes the TUI follow the
 # terminal, so there is no per-launch theme rewrite and nothing to export here.
@@ -11,7 +11,7 @@
 # the OLD, now-revoked token — so opencode would 401 against the proxy. launch.sh
 # runs EVERY boot with the live env, so re-point the on-disk apiKey at the current
 # token here. No-op on a cold boot; skipped on BYO/unset (file removed, or no key).
-CFG=/workspace/.config/opencode/opencode.json
+CFG=/root/workspace/.config/opencode/opencode.json
 if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
   sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
 fi

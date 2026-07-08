@@ -1,7 +1,7 @@
 #!/bin/sh
-# opencode harness bootstrap — runs ONCE on first boot, as root, cwd /workspace, sh.
+# opencode harness bootstrap — runs ONCE on first boot, as root, cwd /root/workspace, sh.
 # Installs the opencode CLI and fills the SEEDED file-based config
-# (/workspace/.config/opencode/opencode.json, copied verbatim from this harness
+# (/root/workspace/.config/opencode/opencode.json, copied verbatim from this harness
 # dir with __...__ placeholders): the yolo permission, theme, and the proxy
 # provider with the embedded model catalog.
 # opencode config is entirely FILE-based — theme:"system" follows the terminal —
@@ -15,9 +15,9 @@ command -v opencode >/dev/null 2>&1 ||
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /workspace/AGENTS.md 2>/dev/null || true
+curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
-[ -n "$host" ] && [ -e /workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /workspace/AGENTS.md
+[ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
 
 # --- proxy-routed config ----------------------------------------------------
 # opencode → @ai-sdk/openai-compatible provider (appends /chat/completions to
@@ -30,8 +30,8 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # So fetch the catalog from the proxy's GET /models and embed it as the models
 # map (like pi). If the fetch is empty (boot-time hiccup), declare at least the
 # default model so the preselected `model` still resolves.
-CFG=/workspace/.config/opencode/opencode.json
-mkdir -p /workspace/.config/opencode
+CFG=/root/workspace/.config/opencode/opencode.json
+mkdir -p /root/workspace/.config/opencode
 
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ] && [ -e "$CFG" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
@@ -75,12 +75,12 @@ EOF
 fi
 
 # --- safety net -------------------------------------------------------------
-# Belt-and-suspenders: no file under /workspace may survive with a raw
+# Belt-and-suspenders: no file under /root/workspace may survive with a raw
 # __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
 # __HOST__, so it is not matched.
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
-grep -rl "__TRIBES_" /workspace 2>/dev/null | while IFS= read -r f; do
+grep -rl "__TRIBES_" /root/workspace 2>/dev/null | while IFS= read -r f; do
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done

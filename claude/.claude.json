@@ -1,6 +1,6 @@
 {
   "projects": {
-    "/workspace": {
+    "/root/workspace": {
       "hasTrustDialogAccepted": true,
       "hasCompletedProjectOnboarding": true,
       "projectOnboardingSeenCount": 1
