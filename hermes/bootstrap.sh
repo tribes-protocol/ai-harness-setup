@@ -61,7 +61,7 @@ if ! command -v hermes >/dev/null 2>&1; then
   if command -v hermes >/dev/null 2>&1; then
     H=/usr/local/lib/hermes-agent
     rm -rf "$H/.git" "$H/website" "$H/tests" "$H/apps/desktop" \
-           /root/workspace/.npm /root/workspace/.cache 2>/dev/null || true
+           "$HOME/.npm" "$HOME/.cache" 2>/dev/null || true
     find "$H/node_modules" -type d -name '*-musl' -prune -exec rm -rf {} + 2>/dev/null || true
     find "$H/venv" -depth -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
     find "$H/venv" -type f -name '*.pyc' -delete 2>/dev/null || true
