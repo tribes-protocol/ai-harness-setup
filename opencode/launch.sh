@@ -18,4 +18,11 @@ if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
   sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
 fi
 
+# --- shared agent skills: refresh to the latest published set every launch ---
+# This is the mechanism that makes template-based sandboxes pick up newly
+# published skills without any repo change. Tolerant + tight timeout; a slow or
+# failed fetch leaves the launch (and any prior install) unaffected.
+SKILLS_RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
+curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/main/install-skills.sh" | sh || true
+
 exec opencode
