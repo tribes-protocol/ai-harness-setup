@@ -60,7 +60,7 @@ fi
 # Nothing installed and nothing pre-existing: leave quietly.
 [ -d "$SKILLS_DIR" ] || exit 0
 
-# --- native loaders: symlink $HOME/.claude/skills and $HOME/.pi/skills ------
+# --- native loaders: symlink $HOME/.claude/skills, $HOME/.pi/agent/skills, $HOME/.openclaw/skills ------
 # Whole-dir symlink by default; per-slug symlinks if the harness already ships a
 # real skills dir with content. Self-gates on the harness config dir existing,
 # so this is a no-op on the other 7 harnesses.
@@ -80,7 +80,8 @@ link_skills() {
   fi
 }
 link_skills ".claude"
-link_skills ".pi"
+link_skills ".pi/agent"
+link_skills ".openclaw"
 
 # --- AGENTS.md-only harnesses: marker-fenced "## Skills" section ------------
 # Idempotently rewrite the block between the markers so the 7 non-native
