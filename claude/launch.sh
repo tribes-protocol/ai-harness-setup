@@ -47,7 +47,7 @@ fi
 # published skills without any repo change. Tolerant + tight timeout; a slow or
 # failed fetch leaves the launch (and any prior install) unaffected.
 SKILLS_RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/main/install-skills.sh" | sh || true
+curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
 
 # IS_SANDBOX=1 lets --dangerously-skip-permissions run as root.
 exec env IS_SANDBOX=1 claude --dangerously-skip-permissions

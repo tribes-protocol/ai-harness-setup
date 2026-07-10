@@ -32,7 +32,7 @@ trap 'rm -rf "$TMP" 2>/dev/null || true' EXIT
 # Derive the codeload tarball URL from the same repo var the AGENTS.md block
 # uses (github.com -> codeload.github.com), defaulting to the canonical repo.
 REPO="${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}"
-TGZ_URL="$(echo "$REPO" | sed 's#//github\.com#//codeload.github.com#')/tar.gz/main"
+TGZ_URL="$(echo "$REPO" | sed 's#//github\.com#//codeload.github.com#')/tar.gz/${TRIBES_HARNESS_REF:-main}"
 
 curl -fsSL --max-time 20 "$TGZ_URL" -o "$TMP/repo.tgz" 2>/dev/null || true
 tar -xzf "$TMP/repo.tgz" -C "$TMP" 2>/dev/null || true
