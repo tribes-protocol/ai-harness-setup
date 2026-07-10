@@ -8,5 +8,18 @@
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku"
   },
   "theme": "auto",
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/tribes-notify.js\""
+          }
+        ]
+      }
+    ]
+  }
 }
