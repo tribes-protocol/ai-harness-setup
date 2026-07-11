@@ -62,8 +62,10 @@ tribes-email folders
 tribes-email list --folder INBOX --limit 20
 ```
 
-`status` shows this sandbox's own address and whether access is active, syncing,
-suspended, or being deleted. It never prints a provider password.
+`status` shows this sandbox's own address, its `accessStatus` (`provisioning`,
+`active`, `suspended`, or `deleting`), and `credentialSyncPending`. It never prints
+a provider password. Status remains available while suspended so the reason for
+blocked folder/message/send commands is visible.
 
 Listing returns the folder's current `uidValidity`, message UIDs, and, when another
 page exists, an opaque cursor. Keep a cursor with the folder that produced it:
@@ -150,4 +152,7 @@ install an alternate client or bypass the control plane:
 command -v tribes-email || echo 'this sandbox predates agent email access'
 ```
 
-Recreate the sandbox on a post-bake image if email access is required.
+Destroying or recreating a sandbox permanently deletes its provider mailbox and all
+messages in it. Never destroy/recreate merely to add this CLI without the user's
+explicit approval after warning them about that data loss. If they approve, recreate
+on a post-bake image; otherwise leave the older sandbox and mailbox intact.
