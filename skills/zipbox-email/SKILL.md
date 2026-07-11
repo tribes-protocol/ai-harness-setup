@@ -139,6 +139,10 @@ do not repeat the command: a retry could create a duplicate. Check Sent and ask 
 user how to proceed. A 429 error includes `Retry-After`; wait until that time rather
 than looping.
 
+A successful result can report `sentCopy: failed`. Delivery succeeded, but the copy
+could not be saved to Sent. Do not retry the send. Tell the user that Sent may not
+contain the delivered message.
+
 ## Lifecycle and missing CLI
 
 The mailbox is created with the sandbox, can be suspended by moderators, and is
