@@ -3,10 +3,12 @@
 # Pi is fully FILE-based: it reads $HOME/.pi/agent/{models,settings}.json,
 # so there is NO env-based config to defer to launch.sh. The two config files are
 # COMMITTED real files (seed files) carrying placeholders; this script only fills
-# the handful of runtime values it can't commit (proxy base, token, default model,
-# and the live model catalog). Skip the proxy fill gracefully when the proxy env
-# is absent (the CLI then falls back to the user's own creds). Config paths are
-# $HOME-relative — the dispatcher decides HOME (old: workspace, new: /root).
+# the handful of runtime values it can't commit (proxy base, token, default model).
+# The LIVE model catalog is fetched per-boot in launch.sh (not one-shot here), so a
+# first-boot GET /models transient self-heals on the next boot; this script only
+# SEEDS a valid models.json with the default model. Skip the proxy fill gracefully
+# when the proxy env is absent (the CLI then falls back to the user's own creds).
+# Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace, new: /root).
 set -e
 
 # --- install ----------------------------------------------------------------
@@ -22,17 +24,18 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 
 # --- proxy-routed config ----------------------------------------------------
 # Pi → an openai-completions provider declared in models.json. Pi does NOT
-# auto-discover models for a custom provider, so fetch the full live catalog from
-# the proxy's GET /models and embed it. If the fetch is empty (boot-time hiccup),
-# substitute an empty array so models.json stays valid JSON.
+# auto-discover models for a custom provider, so the model catalog must be embedded.
+# That catalog fetch now lives in launch.sh (it re-runs EVERY boot so a first-boot
+# GET /models transient self-heals next boot instead of being baked in permanently).
+# Here we only SEED models.json with the single default model, so the file is valid
+# + usable before launch.sh's first fetch and never traps a raw placeholder.
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
   token="$TRIBES_API_KEY"
 
-  # Live catalog → the array CONTENTS for "models": [ ... ] (may be empty).
-  pi_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Bearer $token" 2>/dev/null \
-    | grep -oE '"id":[[:space:]]*"[^"]+"' \
-    | sed -E 's/.*"([^"]+)"$/{ "id": "\1" }/' | paste -sd, -)
+  # Seed the array CONTENTS for "models": [ ... ] with the default model only;
+  # launch.sh replaces this with the live catalog on the first (and every) boot.
+  pi_models="{ \"id\": \"$TRIBES_LLM_MODEL\" }"
 
   # Fill the seed files. Substitute via awk literal gsub (NOT sed) so values that
   # contain '/', '&', or other regex/replacement metacharacters — proxy URL, JSON
