@@ -1,2 +1,9 @@
 [ui]
 theme = "__TRIBES_THEME__"
+
+# `auto` detects the terminal brand and falls back to BEL on an unknown one --
+# and the browser terminal ignores BEL by design (readline rings it on every tab
+# completion, and it carries no message). Pin OSC 777, which zipbox parses into
+# a toast.
+[ui.notifications]
+method = "osc777"

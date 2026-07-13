@@ -3,6 +3,13 @@ model_provider = "tribes"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
+# Notifications reach the browser terminal as an OSC 9 escape, which the zipbox
+# terminal parses into a toast. Without this, `notifications` is off and Codex
+# is silent in the sandbox.
+[tui]
+notifications = true
+notification_method = "osc9"
+
 [model_providers.tribes]
 name = "Tribes LLM Proxy"
 base_url = "__TRIBES_PROXY__"
