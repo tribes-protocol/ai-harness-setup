@@ -4,10 +4,11 @@ approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
 # Notifications reach the browser terminal as an OSC 9 escape, which the zipbox
-# terminal parses into a toast. Without this, `notifications` is off and Codex
-# is silent in the sandbox.
+# terminal parses into a toast. Without a [tui] section Codex is silent in the
+# sandbox. `notifications` MUST be the event list -- `notifications = true`
+# parses without error but emits nothing (verified on a box).
 [tui]
-notifications = true
+notifications = ["agent-turn-complete", "approval-requested"]
 notification_method = "osc9"
 
 [model_providers.tribes]
