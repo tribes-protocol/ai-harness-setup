@@ -9,17 +9,5 @@
   },
   "theme": "auto",
   "skipDangerousModePermissionPrompt": true,
-  "hooks": {
-    "Notification": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/tribes-notify.js\""
-          }
-        ]
-      }
-    ]
-  }
+  "preferredNotifChannel": "iterm2"
 }
