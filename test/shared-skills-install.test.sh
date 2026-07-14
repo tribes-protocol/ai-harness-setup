@@ -140,6 +140,9 @@ for slug in $EXPECTED; do
   grep -F "Read: /root/skills/$slug/SKILL.md" /root/workspace/AGENTS.md >/dev/null \
     || fail "$slug AGENTS route does not use the canonical path"
 done
+if grep -F '— >- Read:' /root/workspace/AGENTS.md >/dev/null; then
+  fail "AGENTS routes contain an unparsed folded-description marker"
+fi
 
 snapshot() {
   find /root/skills /root/.claude/skills /root/.pi/agent/skills /root/.openclaw/skills \
