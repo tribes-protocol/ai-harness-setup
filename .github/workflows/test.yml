@@ -15,3 +15,5 @@ jobs:
         run: sh test/launch-token-refresh.test.sh
       - name: skills authoring contract (mirrors the downstream consumer)
         run: sh test/skills-contract.test.sh
+      - name: shared skills installation contract
+        run: sudo -E sh test/shared-skills-install.test.sh

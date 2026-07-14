@@ -37,7 +37,7 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 [ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
 
 # --- shared agent skills (single source of truth, refreshed at boot) --------
-# Install the published skill set into $HOME/.agent-skills and wire the native
+# Install the published skill set read-only under /root/skills and wire the native
 # (claude/pi) or AGENTS.md loaders. Runs after all config writes; fully
 # tolerant, so it never blocks or fails the boot.
 curl -fsSL --max-time 20 "$RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
