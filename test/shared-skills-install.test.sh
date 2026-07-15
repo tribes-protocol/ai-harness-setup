@@ -10,6 +10,7 @@ REPO="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 EXPECTED="zipbox-browser
 zipbox-caddy
 zipbox-dns
+zipbox-egress
 zipbox-email
 zipbox-websearch"
 
