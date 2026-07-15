@@ -18,11 +18,13 @@ calls) is a separate system; see the last section. This skill is about how your
 
 ## Which mode am I in?
 
-| Harness / tag              | `egressMode` | Egress path      | Billed |
-| -------------------------- | ------------ | ---------------- | ------ |
-| harness `ata` (trading)    | (overridden) | **MITM**         | no     |
-| tag `tribes.xyz`           | `mitm`       | **MITM**         | no     |
-| everything else (default)  | `proxy`      | **PROXY** (tollbooth) | yes |
+| Harness / tag              | `egressMode` | Egress path      | Metered |
+| -------------------------- | ------------ | ---------------- | ------- |
+| harness `ata` (trading)    | (overridden) | **MITM**         | yes (see billing model below) |
+| tag `tribes.xyz`           | `mitm`       | **MITM**         | yes (see billing model below) |
+| everything else (default)  | `proxy`      | **PROXY** (tollbooth) | yes (per-request wallet charge) |
+
+Neither path is free. They meter **differently** — see "Billing model" below.
 
 The mode is derived from the sandbox tag by `egressModeForTag()`
 (`packages/sandboxing/src/shared/utils/EgressCatalog.ts:236`) and written into
@@ -95,7 +97,7 @@ per-provider placeholder strings and slots live in the catalog
 (`packages/sandboxing/src/shared/utils/EgressCatalog.ts`); read it for the
 provider you're calling.
 
-## MITM mode (iron-proxy) — first-party, transparent, not billed
+## MITM mode (iron-proxy) — first-party, transparent
 
 MITM is for first-party harnesses (trading `ata`, `tribes.xyz`). There is **no
 `ZIPBOX_EGRESS_PROXY_URL` and no `HTTPS_PROXY` to set** — interception is
@@ -109,17 +111,44 @@ transparent:
   so TLS to those hosts validates; `ensureEgressCa` re-heals it on restored
   disks (`apps/sandboxd/src/helpers/EgressCaHeal.ts:93`).
 - It uses the **same provider catalog and the same slot rules** as the
-  tollbooth, but injection is additive and the calls are **not metered**.
+  tollbooth, but injection is additive: iron-proxy injects the **real
+  first-party key** locally and forwards **direct upstream** to the provider
+  (`apps/sandboxd/src/utils/EgressProxyConfig.ts:92-97`) — it does **not** relay
+  through `apps/api`'s per-request tollbooth charge.
 
 So in MITM you just call the provider normally over HTTPS with the placeholder
 in its slot — the transparent proxy keys it. Nothing to configure in the guest.
+MITM is **not free** — see "Billing model".
+
+## Billing model — both modes are metered, differently
+
+Do not treat MITM as free egress.
+
+- **PROXY (tollbooth) — per-request wallet charge.** Before forwarding,
+  `apps/api` reserves a debit on the user's wallet
+  (`reserveEgressCharge`, `apps/api/src/controllers/EgressTollboothController.ts:62-71`),
+  with the amount from the per-endpoint cost table
+  (`resolveEndpointCostUsd`, `apps/api/src/services/EgressTollboothService.ts:212`).
+  A non-positive balance gates the call (out-of-credits).
+- **MITM — metered, but not via that per-request wallet debit.** The tollbooth
+  wallet path explicitly marks `tribes.xyz` egress "zero-rated for now"
+  (`apps/api/src/controllers/EgressTollboothController.ts:58`,
+  `packages/sandboxing/src/shared/utils/EgressCatalog.ts:233-234`), so no
+  per-call debit is applied on the MITM path. That is **not the same as free**:
+  iron-proxy forwards using the platform's **real first-party provider keys**
+  (real upstream spend the platform bears) and measures traffic on its metrics
+  endpoint (`127.0.0.1:19090`, `apps/sandboxd/src/utils/EgressProxyConfig.ts:110`).
+  Metered (mechanism: real first-party key spend + iron-proxy metrics; the
+  per-call wallet charge is deliberately off on this path — the code comment's
+  "for now" signals it is a policy toggle, not free egress).
 
 ## Not this: the LLM proxy
 
 `/llm/proxy` meters the agent's **own** model calls and is unrelated to egress
 key injection. "The trading harness needs no LLM-proxy indirection" means its
-data-provider egress goes through the transparent MITM path, not the billed
-tollbooth — it does **not** mean it skips model metering.
+data-provider egress goes through the transparent MITM path, not the
+per-request tollbooth — it does **not** mean egress is free (see "Billing
+model") and it does **not** mean it skips model metering.
 
 ## Related hardening
 
