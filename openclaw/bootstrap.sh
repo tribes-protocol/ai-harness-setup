@@ -73,8 +73,17 @@ grep -rl "__TRIBES_" /root/workspace "$HOME/.openclaw" 2>/dev/null | while IFS= 
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done
 
-# --- shared agent skills (single source of truth, refreshed at boot) --------
-# Install the published skill set read-only under /root/skills and wire the native
-# (claude/pi) or AGENTS.md loaders. Runs after all config writes; fully
-# tolerant, so it never blocks or fails the boot.
-curl -fsSL --max-time 20 "$RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+# --- shared agent skills (single source of truth, installed at boot) --------
+# Install the skill set read-only under /root/skills and wire the native
+# (claude/pi) or AGENTS.md loaders. Drive-first (#1914): the shared read-only
+# /opt/harnesses drive bakes the pinned catalog AND this installer, so a stock
+# boot runs the baked copy and needs no network for skills. The installer is
+# fetched only when the drive predates skills (old image, dev backend) or a
+# pinned TRIBES_HARNESS_REF (QA) must exercise that branch's own installer.
+# Runs after all config writes; fully tolerant, so it never blocks or fails
+# the boot.
+if [ -z "${TRIBES_HARNESS_REF:-}" ] && [ -f /opt/harnesses/skills/install-skills.sh ]; then
+  sh /opt/harnesses/skills/install-skills.sh || true
+else
+  curl -fsSL --max-time 20 "$RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+fi

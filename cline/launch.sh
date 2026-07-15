@@ -17,12 +17,20 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
     --modelid "$TRIBES_LLM_MODEL" >/dev/null 2>&1 || true
 fi
 
-# --- shared agent skills: refresh to the latest published set every launch ---
-# This is the mechanism that makes template-based sandboxes pick up newly
-# published skills without any repo change. Tolerant + tight timeout; a slow or
-# failed fetch leaves the launch (and any prior install) unaffected.
-SKILLS_RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+# --- shared agent skills: reconverge on every launch -------------------------
+# Drive-first (#1914): run the installer baked onto the shared read-only
+# /opt/harnesses drive, so every launch reconverges /root/skills on the drive's
+# pinned catalog with no network. The fetch survives as the fallback for a
+# drive that predates skills (old image, dev backend) and for a pinned
+# TRIBES_HARNESS_REF (QA), which must exercise that branch's own installer.
+# Tolerant + tight timeout; a slow or failed fetch leaves the launch (and any
+# prior install) unaffected.
+if [ -z "${TRIBES_HARNESS_REF:-}" ] && [ -f /opt/harnesses/skills/install-skills.sh ]; then
+  sh /opt/harnesses/skills/install-skills.sh || true
+else
+  SKILLS_RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
+  curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+fi
 
 # -i opens the interactive TUI; --auto-approve true runs without prompting (the
 # VM is the security boundary).
