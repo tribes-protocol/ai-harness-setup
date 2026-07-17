@@ -34,9 +34,9 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 CFG="$HOME/.config/opencode/opencode.json"
 mkdir -p "$HOME/.config/opencode"
 
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ] && [ -e "$CFG" ]; then
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ] && [ -e "$CFG" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
-  token="$TRIBES_API_KEY"
   oc_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Bearer $token" 2>/dev/null \
     | grep -oE '"id":[[:space:]]*"[^"]+"' \
     | sed -E 's/.*"([^"]+)"$/"\1": {}/' | paste -sd, -)

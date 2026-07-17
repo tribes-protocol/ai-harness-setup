@@ -5,9 +5,11 @@
 # ask, never sandbox; the VM is the security boundary).
 
 # config.toml's [model_providers.tribes] reads OPENAI_API_KEY as the Bearer
-# token. Only export when present so an unset proxy key lets Codex fall back to
-# the user's own credentials.
-[ -n "$TRIBES_API_KEY" ] && export OPENAI_API_KEY="$TRIBES_API_KEY"
+# token. The bearer is minted in-VM by tribes-agent-token (an ES256 JWT signed
+# with the P-256 agent key); export it only when non-empty so a keyless BYO/
+# external box lets Codex fall back to the user's own credentials.
+token="$(tribes-agent-token 2>/dev/null || true)"
+[ -n "$token" ] && export OPENAI_API_KEY="$token"
 
 # --- shared agent skills: refresh to the latest published set every launch ---
 # This is the mechanism that makes template-based sandboxes pick up newly

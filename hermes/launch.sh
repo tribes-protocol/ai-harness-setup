@@ -17,14 +17,15 @@ if [ -f "$HOME/.hermes/config.yaml" ]; then
 fi
 
 # --- restore-safety: refresh the proxy token from the LIVE env --------------
-# bootstrap.sh baked TRIBES_API_KEY (api_key) into config.yaml ONCE, on first
-# boot. A PAUSE -> RESTORE re-mints the per-sandbox key (the old token is REVOKED
-# and a fresh TRIBES_API_KEY rides the boot cmdline), but the restored disk still
-# holds the OLD, now-revoked token — so hermes would 401 against the proxy.
-# launch.sh runs EVERY boot with the live env, so re-point the on-disk api_key at
-# the current token here. No-op on a cold boot; skipped on BYO/unset.
-if [ -n "$TRIBES_API_KEY" ] && [ -f "$HOME/.hermes/config.yaml" ]; then
-  sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$HOME/.hermes/config.yaml"
+# The bearer is a short-lived ES256 JWT minted in-VM by tribes-agent-token (signed
+# with the P-256 agent key). bootstrap.sh baked one into config.yaml (api_key) on
+# first boot; it goes stale (expiry, or a PAUSE -> RESTORE onto a disk holding the
+# previous boot's token), so re-mint and re-point the on-disk api_key every launch.
+# Match the api_key field value so the swap works for any prior token (a JWT has no
+# sed-special chars). No-op on a cold boot; skipped on a keyless BYO/unset box.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$token" ] && [ -f "$HOME/.hermes/config.yaml" ]; then
+  sed -i "s|api_key: \"[^\"]*\"|api_key: \"$token\"|" "$HOME/.hermes/config.yaml"
 fi
 
 # --- seal the venv against banner-time lazy installs ------------------------
@@ -49,7 +50,7 @@ export HERMES_DISABLE_LAZY_INSTALLS=1
 # bring-your-own-keys). The /opt/tribes marker keeps a user who backs out from
 # being re-trapped on every relaunch (they can rerun `hermes setup` anytime),
 # and a completed setup writes providers into config.yaml, which also skips.
-if [ -z "$TRIBES_API_KEY" ] \
+if [ -z "$token" ] \
    && ! grep -q '^providers:' "$HOME/.hermes/config.yaml" 2>/dev/null \
    && [ ! -e /opt/tribes/.hermes-setup-offered ]; then
   mkdir -p /opt/tribes && : > /opt/tribes/.hermes-setup-offered

@@ -8,11 +8,10 @@
 
 # --- (re)generate models.json from the LIVE env every boot ------------------
 # Two problems this fixes, both from doing it ONCE in bootstrap.sh:
-#   1. restore-safety: a PAUSE -> RESTORE re-mints the per-sandbox key — the
-#      control plane REVOKES the old TRIBES_API_KEY and injects a fresh one on the
-#      boot cmdline, while the restored disk still holds the OLD, now-revoked
-#      token. Pi would present a dead key and the proxy 401s. Regenerating with the
-#      live cmdline env re-points apiKey at the current token.
+#   1. token freshness: the bearer is a short-lived ES256 JWT minted in-VM by
+#      tribes-agent-token (signed with the P-256 agent key). Re-minting every launch
+#      keeps the on-disk apiKey a live, unexpired token — including after a PAUSE ->
+#      RESTORE, where the disk still holds the previous boot's now-stale JWT.
 #   2. empty-catalog self-heal: the catalog comes from an authenticated GET
 #      /models; a first-boot empty/401 fetch would otherwise be BAKED IN forever
 #      ("No models available"). Re-fetching every boot lets the next boot recover,
@@ -22,9 +21,9 @@
 # (bootstrap removed models.json, so the -f guard is false; pi uses the user's
 # creds). Config paths are $HOME-relative — the dispatcher decides HOME.
 CFG="$HOME/.pi/agent/models.json"
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ] && [ -f "$CFG" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
-  token="$TRIBES_API_KEY"
 
   # Live catalog → the array CONTENTS for "models": [ ... ]. Fall back to the
   # single default model on an empty/failed fetch — NEVER an empty array.
