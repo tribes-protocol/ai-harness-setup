@@ -26,7 +26,7 @@
 AGENTS="/root/workspace/AGENTS.md"
 SKILLS_DIR="/root/skills"
 LEGACY_SKILLS_DIR="$HOME/.agent-skills"
-EXPECTED_SKILLS="zipbox-browser zipbox-caddy zipbox-dns zipbox-egress zipbox-email zipbox-websearch"
+EXPECTED_SKILLS="zipbox-browser zipbox-caddy zipbox-dns zipbox-egress zipbox-email zipbox-wallet zipbox-websearch"
 
 TMP="$(mktemp -d 2>/dev/null || true)"
 [ -n "$TMP" ] || { TMP="/tmp/agent-skills.$$"; mkdir -p "$TMP" 2>/dev/null || true; }
