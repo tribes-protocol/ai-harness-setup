@@ -11,6 +11,15 @@
 # anyway so a missing file never makes sed -i create/break one.
 # Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace,
 # new: /root).
+# --- re-render the agent primer (restore-safety, like the token refresh) -----
+# bootstrap.sh's sed CONSUMED the primer placeholders, freezing whatever the box
+# knew at first boot: the boot-slug hostname (a claim adds a DNS alias and never
+# renames the VM) and "none" identity values if the agent_identities row wasn't
+# bound yet. AGENTS.md is auto-loaded into the agent's context, so a frozen primer
+# feeds it a WRONG public URL by default. Re-render from the untouched template
+# with this launch's live env so both self-heal and survive restore.
+sh /opt/tribes/render-primer.sh 2>/dev/null || true
+
 if [ -f "$HOME/.hermes/config.yaml" ]; then
   skin=$([ "$TRIBES_THEME" = light ] && echo daylight || echo default)
   sed -i "s|^  skin:.*|  skin: $skin|" "$HOME/.hermes/config.yaml"

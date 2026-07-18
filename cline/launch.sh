@@ -10,6 +10,15 @@
 # restored disk still carries the OLD providers.json token (now stale -> proxy
 # 401), so only a live re-auth refreshes it. Idempotent — re-running just
 # overwrites the provider file. Skipped on a keyless BYO/unset box so the user's own creds stand.
+# --- re-render the agent primer (restore-safety, like the token refresh) -----
+# bootstrap.sh's sed CONSUMED the primer placeholders, freezing whatever the box
+# knew at first boot: the boot-slug hostname (a claim adds a DNS alias and never
+# renames the VM) and "none" identity values if the agent_identities row wasn't
+# bound yet. AGENTS.md is auto-loaded into the agent's context, so a frozen primer
+# feeds it a WRONG public URL by default. Re-render from the untouched template
+# with this launch's live env so both self-heal and survive restore.
+sh /opt/tribes/render-primer.sh 2>/dev/null || true
+
 token="$(tribes-agent-token 2>/dev/null || true)"
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   cline auth openai-compatible \

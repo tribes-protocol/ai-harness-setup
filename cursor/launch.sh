@@ -7,6 +7,15 @@
 
 # No browser exists in the VM — make `agent login` PRINT its auth URL instead
 # of trying to open one, so the user completes OAuth on their own machine.
+# --- re-render the agent primer (restore-safety, like the token refresh) -----
+# bootstrap.sh's sed CONSUMED the primer placeholders, freezing whatever the box
+# knew at first boot: the boot-slug hostname (a claim adds a DNS alias and never
+# renames the VM) and "none" identity values if the agent_identities row wasn't
+# bound yet. AGENTS.md is auto-loaded into the agent's context, so a frozen primer
+# feeds it a WRONG public URL by default. Re-render from the untouched template
+# with this launch's live env so both self-heal and survive restore.
+sh /opt/tribes/render-primer.sh 2>/dev/null || true
+
 export NO_OPEN_BROWSER=1
 
 # bootstrap.sh symlinked the binary to /usr/local/bin; keep the installer's own

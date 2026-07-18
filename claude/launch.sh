@@ -7,6 +7,15 @@
 # Config paths are $HOME-relative — the dispatcher decides HOME (old: workspace,
 # new: /root).
 
+# --- re-render the agent primer (restore-safety, same as the token below) ---
+# bootstrap.sh's sed CONSUMED the primer placeholders, freezing whatever the box
+# knew at first boot: the boot-slug hostname (a claim adds a DNS alias and never
+# renames the VM) and "none" identity values if the agent_identities row wasn't
+# bound yet. AGENTS.md is auto-loaded into the agent's context, so a frozen primer
+# feeds it a WRONG public URL by default. Re-render from the untouched template
+# with this launch's live env so both self-heal and survive restore.
+TRIBES_PRIMER_ALSO_CLAUDE_MD=1 sh /opt/tribes/render-primer.sh 2>/dev/null || true
+
 # --- proxy-routed: point claude at the metered LLM proxy --------------------
 # When the control plane marks claude proxy-routed it injects TRIBES_LLM_MODEL +
 # API_BASE_URL; the per-sandbox bearer is minted in-VM by tribes-agent-token (a

@@ -20,6 +20,15 @@
 # No-op-equivalent on a cold boot (rewrites identical content); skipped on BYO/unset
 # (bootstrap removed models.json, so the -f guard is false; pi uses the user's
 # creds). Config paths are $HOME-relative — the dispatcher decides HOME.
+# --- re-render the agent primer (restore-safety, like the token refresh) -----
+# bootstrap.sh's sed CONSUMED the primer placeholders, freezing whatever the box
+# knew at first boot: the boot-slug hostname (a claim adds a DNS alias and never
+# renames the VM) and "none" identity values if the agent_identities row wasn't
+# bound yet. AGENTS.md is auto-loaded into the agent's context, so a frozen primer
+# feeds it a WRONG public URL by default. Re-render from the untouched template
+# with this launch's live env so both self-heal and survive restore.
+sh /opt/tribes/render-primer.sh 2>/dev/null || true
+
 CFG="$HOME/.pi/agent/models.json"
 token="$(tribes-agent-token 2>/dev/null || true)"
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ] && [ -f "$CFG" ]; then
