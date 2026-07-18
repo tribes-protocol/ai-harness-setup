@@ -21,6 +21,13 @@ RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-h
 curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 [ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
+# Identity block (email/EVM/SOL) — same substitution as __HOST__ above; "none"
+# when this boot has no bound agent_identities row (composeSandboxBootEnv omits
+# the env var for a non-identity box).
+email="${TRIBES_IDENTITY_EMAIL:-none}"
+evm="${TRIBES_IDENTITY_EVM_ADDRESS:-none}"
+sol="${TRIBES_IDENTITY_SOL_ADDRESS:-none}"
+[ -e /root/workspace/AGENTS.md ] && sed -i "s|__EMAIL__|$email|g; s|__EVM__|$evm|g; s|__SOL__|$sol|g" /root/workspace/AGENTS.md
 
 # --- proxy-routed config ----------------------------------------------------
 # Pi → an openai-completions provider declared in models.json. Pi does NOT
