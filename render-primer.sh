@@ -46,23 +46,38 @@ fi
 [ -s "$TEMPLATE" ] || exit 0
 
 # --- resolve the current values --------------------------------------------
-# TRIBES_PUBLIC_HOST is the claimed public FQDN from the control plane and is the
-# ONLY authoritative source; $HOSTNAME/`hostname` are the boot slug and are just a
-# last-resort fallback so a box still gets a plausible primer if the var is absent.
-host="${TRIBES_PUBLIC_HOST:-${HOSTNAME:-$(hostname 2>/dev/null || true)}}"
-email="${TRIBES_IDENTITY_EMAIL:-none}"
-evm="${TRIBES_IDENTITY_EVM_ADDRESS:-none}"
-sol="${TRIBES_IDENTITY_SOL_ADDRESS:-none}"
+# TRIBES_PUBLIC_HOST (the claimed public FQDN, emitted by the control plane at
+# claim) is the ONLY authoritative source. There is deliberately NO fallback to
+# $HOSTNAME/`hostname`: the guest's hostname is the BOOT SLUG, and since a claim
+# only adds a DNS alias and never renames the VM, it can never equal the claimed
+# name on an adopted box. Falling back to it would not degrade gracefully — it
+# would deterministically re-render the original bug (a confidently WRONG public
+# URL) precisely when delivery failed. A missing line makes the agent check or
+# ask; a wrong line makes it act on a falsehood. Absent → unknown, never a guess.
+host="${TRIBES_PUBLIC_HOST:-}"
+email="${TRIBES_IDENTITY_EMAIL:-}"
+evm="${TRIBES_IDENTITY_EVM_ADDRESS:-}"
+sol="${TRIBES_IDENTITY_SOL_ADDRESS:-}"
 
 # --- render -----------------------------------------------------------------
 # Render to a temp file and move into place, so a failure never leaves a
 # half-written primer. `|` delimiters + these values (hostnames, emails, 0x/base58
 # addresses) carry no `|`, matching the substitution bootstrap.sh already used.
 out="$WORKSPACE/.AGENTS.md.rendering"
-sed -e "s|__HOST__|$host|g" \
-    -e "s|__EMAIL__|$email|g" \
-    -e "s|__EVM__|$evm|g" \
-    -e "s|__SOL__|$sol|g" \
+
+# With no authoritative host, DROP the "Public URL" claim outright — asserting a
+# URL we can't stand behind is the defect. The Hostname line degrades to an
+# explicit `unknown` so the identity block stays structurally intact.
+if [ -n "$host" ]; then
+  host_filter="s|__HOST__|$host|g"
+else
+  host_filter="/\*\*Public URL:\*\*/d; s|__HOST__|unknown|g"
+fi
+
+sed -e "$host_filter" \
+    -e "s|__EMAIL__|${email:-unknown}|g" \
+    -e "s|__EVM__|${evm:-unknown}|g" \
+    -e "s|__SOL__|${sol:-unknown}|g" \
     "$TEMPLATE" > "$out" 2>/dev/null || { rm -f "$out"; exit 0; }
 [ -s "$out" ] || { rm -f "$out"; exit 0; }
 mv "$out" "$WORKSPACE/AGENTS.md"
