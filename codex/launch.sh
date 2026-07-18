@@ -7,6 +7,15 @@
 # config.toml's [model_providers.tribes] reads OPENAI_API_KEY as the Bearer
 # token. Only export when present so an unset proxy key lets Codex fall back to
 # the user's own credentials.
+# --- re-render the agent primer (restore-safety, like the token refresh) -----
+# bootstrap.sh's sed CONSUMED the primer placeholders, freezing whatever the box
+# knew at first boot: the boot-slug hostname (a claim adds a DNS alias and never
+# renames the VM) and "none" identity values if the agent_identities row wasn't
+# bound yet. AGENTS.md is auto-loaded into the agent's context, so a frozen primer
+# feeds it a WRONG public URL by default. Re-render from the untouched template
+# with this launch's live env so both self-heal and survive restore.
+sh /opt/tribes/render-primer.sh 2>/dev/null || true
+
 [ -n "$TRIBES_API_KEY" ] && export OPENAI_API_KEY="$TRIBES_API_KEY"
 
 # --- shared agent skills: refresh to the latest published set every launch ---
