@@ -100,14 +100,33 @@ else
   fail "TRIBES_PUBLIC_HOST (control plane) beats the guest hostname"
 fi
 
-# 6. Absent TRIBES_PUBLIC_HOST, fall back to the hostname rather than emitting an
-#    empty URL — a degraded primer still beats a broken one.
+# 6. THE REGRESSION THAT DEFINES THIS FIX: with no authoritative host, the primer
+#    must NOT fabricate one. There is deliberately no $HOSTNAME/`hostname`
+#    fallback — the guest hostname is the boot slug and can never equal the
+#    claimed name on an adopted box, so falling back to it would deterministically
+#    re-render the original bug exactly when delivery failed. A missing line makes
+#    the agent check or ask; a wrong line makes it act on a falsehood.
 setup
-render "" "$EMAIL" "$EVM" "$SOL"
-if grep -q "$POOL_SLUG" "$ws/AGENTS.md" && ! grep -q '__HOST__' "$ws/AGENTS.md"; then
-  pass "falls back to the guest hostname when the control plane sends no host"
+render "" "$EMAIL" "$EVM" "$SOL"   # HOSTNAME is still exported as the pool slug
+if grep -q "$POOL_SLUG" "$ws/AGENTS.md"; then
+  fail "no fabricated host when the control plane sends none (leaked the boot slug)"
+elif grep -q '__HOST__' "$ws/AGENTS.md"; then
+  fail "no fabricated host when the control plane sends none (raw placeholder left)"
+elif grep -q 'Public URL:' "$ws/AGENTS.md"; then
+  fail "no fabricated host when the control plane sends none (kept an unbacked URL claim)"
 else
-  fail "falls back to the guest hostname when the control plane sends no host"
+  pass "no fabricated host when the control plane sends none — URL claim dropped"
+fi
+
+# 6b. Same rule for identity: absent must read as an explicit unknown, never a
+#     plausible-looking value the agent would act on.
+setup
+render "$CLAIMED" "" "" ""
+if grep -q 'Email: unknown' "$ws/AGENTS.md" && grep -q 'EVM wallet: unknown' "$ws/AGENTS.md" &&
+   grep -q 'Solana wallet: unknown' "$ws/AGENTS.md"; then
+  pass "absent identity renders an explicit unknown, never a fabricated value"
+else
+  fail "absent identity renders an explicit unknown, never a fabricated value"
 fi
 
 # 7. A missing/unreadable template must NOT truncate an existing primer.
