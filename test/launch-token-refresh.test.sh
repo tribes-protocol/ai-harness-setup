@@ -170,6 +170,107 @@ else
   fail "claude: settings.json's \"env\" key moved — the bun-absent awk fallback will emit invalid JSON"
 fi
 
+# --- #2255: the direct-provider escape hatch is closed at exec ---------------
+# On a proxy-routed box SandboxBootEnv injects a PLACEHOLDER OPENROUTER_API_KEY.
+# Harnesses that auto-register a provider on env presence alone (pi via
+# pi-ai/dist/providers/openrouter.js + env-api-keys.js; opencode likewise) can then
+# pick OpenRouter DIRECTLY, bypassing the metered proxy and 401ing on the
+# placeholder. launch.sh must drop it before exec.
+#
+# Observed AT EXEC, not by grepping the script: a stub harness binary records what
+# it actually inherited. A grep would pass on a `unset` placed after the exec, or
+# inside a branch that never runs.
+hatch_stub="$TMP/hatchbin"
+mkdir -p "$hatch_stub"
+for bin in pi opencode openclaw hermes grok cline; do
+  cat > "$hatch_stub/$bin" <<EOF
+#!/bin/sh
+if [ "\$1" = auth ]; then exit 0; fi
+printf '%s' "\${OPENROUTER_API_KEY-<UNSET>}" > "$TMP/inherited_\$(basename "\$0")"
+exit 0
+EOF
+  chmod +x "$hatch_stub/$bin"
+done
+cp "$STUB/tribes-agent-token" "$hatch_stub/tribes-agent-token"
+# Shadow curl so this section is hermetic. grok/launch.sh waits on real egress
+# (up to 30 attempts against api.x.ai) and every launch.sh fetches the skills
+# bundle; on an offline runner that is ~90s of timeouts per invocation, and it
+# would make these checks depend on the network to reach the exec they assert on.
+printf '#!/bin/sh\nexit 0\n' > "$hatch_stub/curl"
+chmod +x "$hatch_stub/curl"
+
+PLACEHOLDER="sk-or-v1-zipbox-openrouter-00000000000000000000000000"
+USER_KEY="sk-or-v1-the-users-own-real-byo-key-do-not-touch-it-0000000"
+
+# (a) POSITIVE — proxy-routed box: the placeholder must NOT survive to the harness.
+for h in pi opencode openclaw hermes grok cline; do
+  home="$TMP/hatch/$h"; mkdir -p "$home"
+  rm -f "$TMP/inherited_$h"
+  HOME="$home" PATH="$hatch_stub:$STUB:$PATH" \
+    API_BASE_URL="https://api.example" \
+    TRIBES_LLM_MODEL="m" TRIBES_THEME="dark" \
+    OPENROUTER_API_KEY="$PLACEHOLDER" \
+    sh "$REPO/$h/launch.sh" >/dev/null 2>&1 || true
+  got="$(cat "$TMP/inherited_$h" 2>/dev/null || echo '<NOEXEC>')"
+  if [ "$got" = "<UNSET>" ]; then
+    pass "$h: proxy box — placeholder OPENROUTER_API_KEY dropped before exec (#2255)"
+  else
+    fail "$h: proxy box — harness still inherited OPENROUTER_API_KEY ($got): direct-provider hatch OPEN"
+  fi
+done
+
+# (b) NEGATIVE — BYO / external box: the user's OWN key must be untouched.
+# This is the by-construction case: SandboxBootEnv writes TRIBES_LLM_MODEL only
+# for proxy-mode, non-byoKey, non-'external' boxes, so on BYO/external the var is
+# absent and the unset branch must not run. If someone "simplifies" the guard away
+# (or makes the unset unconditional), this fails — which is the whole point.
+for h in pi opencode openclaw hermes grok cline; do
+  home="$TMP/hatch-byo/$h"; mkdir -p "$home"
+  rm -f "$TMP/inherited_$h"
+  ( unset TRIBES_LLM_MODEL
+    HOME="$home" PATH="$hatch_stub:$STUB:$PATH" \
+      API_BASE_URL="https://api.example" \
+      TRIBES_THEME="dark" \
+      OPENROUTER_API_KEY="$USER_KEY" \
+      sh "$REPO/$h/launch.sh" ) >/dev/null 2>&1 || true
+  got="$(cat "$TMP/inherited_$h" 2>/dev/null || echo '<NOEXEC>')"
+  if [ "$got" = "$USER_KEY" ]; then
+    pass "$h: BYO/external — the user's own OPENROUTER_API_KEY is preserved"
+  else
+    fail "$h: BYO/external — user's OPENROUTER_API_KEY was clobbered (got: $got)"
+  fi
+done
+
+# opencode additionally disables the provider in its seed config: opencode
+# registers ANY provider with a present env var, and the seed is what the TUI
+# reads. Env-unset alone would leave a box that re-exports the key (a user, a
+# skill) able to pick OpenRouter again.
+if grep -q '"disabled_providers"' "$REPO/opencode/.config/opencode/opencode.json" &&
+   grep -q 'openrouter' "$REPO/opencode/.config/opencode/opencode.json"; then
+  pass "opencode: seed config disables the openrouter provider (#2255)"
+else
+  fail "opencode: seed config no longer disables the openrouter provider"
+fi
+
+# The BYO fallback config that bootstrap.sh writes when there is no proxy env must
+# NOT carry the disable — a BYO user's own OpenRouter key has to keep working.
+if sed -n '/^  cat > "\$CFG" <<.EOF./,/^EOF$/p' "$REPO/opencode/bootstrap.sh" | grep -q 'disabled_providers'; then
+  fail "opencode: the BYO fallback config disables openrouter — breaks BYO OpenRouter users"
+else
+  pass "opencode: BYO fallback config leaves openrouter enabled"
+fi
+
+# Constraint: never a blanket process-wide proxy. The forwarder catalog is a
+# CONNECT allowlist that 403s every non-catalog authority, so exporting
+# HTTP(S)_PROXY would break github/npm/apt/pypi on every box.
+for h in pi opencode openclaw hermes grok cline claude codex; do
+  if grep -qE '^[[:space:]]*export[[:space:]]+(HTTPS?_PROXY|https?_proxy)' "$REPO/$h/launch.sh" "$REPO/$h/bootstrap.sh" 2>/dev/null; then
+    fail "$h: exports a process-wide HTTP(S)_PROXY — would 403 github/npm/apt via the CONNECT allowlist"
+  else
+    pass "$h: no process-wide HTTP(S)_PROXY export"
+  fi
+done
+
 if [ "$fails" -ne 0 ]; then
   printf '\n%d check(s) failed\n' "$fails"
   exit 1
