@@ -4,15 +4,16 @@
 # providers.json) — there is no committed seed config and no env-based config.
 
 # --- restore-safety: (re-)auth the proxy provider from the LIVE env ---------
-# The auth command runs HERE, every launch — not only in bootstrap.sh — so a
-# PAUSE -> RESTORE picks up the re-minted TRIBES_API_KEY. The control plane
-# REVOKES the old token and injects a fresh TRIBES_API_KEY on the boot cmdline,
-# but the restored disk still carries the OLD providers.json token (now revoked ->
-# proxy 401); only a live re-auth refreshes it. Idempotent — re-running just
-# overwrites the provider file. Skipped on BYO/unset so the user's own creds stand.
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
+# The auth command runs HERE, every launch — not only in bootstrap.sh — so each
+# boot re-auths with a freshly-minted bearer. The bearer is a short-lived ES256
+# JWT minted in-VM by tribes-agent-token (signed with the P-256 agent key); a
+# restored disk still carries the OLD providers.json token (now stale -> proxy
+# 401), so only a live re-auth refreshes it. Idempotent — re-running just
+# overwrites the provider file. Skipped on a keyless BYO/unset box so the user's own creds stand.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   cline auth openai-compatible \
-    --apikey "$TRIBES_API_KEY" \
+    --apikey "$token" \
     --baseurl "${API_BASE_URL}/llm/proxy" \
     --modelid "$TRIBES_LLM_MODEL" >/dev/null 2>&1 || true
 fi

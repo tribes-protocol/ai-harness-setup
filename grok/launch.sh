@@ -24,13 +24,16 @@ mkdir -p "$HOME/.grok"
 sed -i "s|theme = \"[^\"]*\"|theme = \"$theme\"|" "$HOME/.grok/config.toml"
 
 # --- proxy (ENV-only for grok) ----------------------------------------------
-# grok CLI → OpenAI chat surface via its base-url override. An existing session
-# beats the key, so log out first. Under `setsid -w` (own session, no controlling
-# tty) so the grok binary can't grab/leave the pty's foreground group
-# backgrounded; -w waits so creds are cleared before grok starts.
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
+# grok CLI → OpenAI chat surface via its base-url override. The bearer is minted
+# in-VM by tribes-agent-token (an ES256 JWT signed with the P-256 agent key); it is
+# empty on a keyless BYO/external box, so grok then falls back to the user's own
+# xAI account. An existing session beats the key, so log out first. Under
+# `setsid -w` (own session, no controlling tty) so the grok binary can't grab/leave
+# the pty's foreground group backgrounded; -w waits so creds are cleared before grok starts.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   export GROK_MODELS_BASE_URL="${API_BASE_URL}/llm/proxy"
-  export GROK_CODE_XAI_API_KEY="$TRIBES_API_KEY"
+  export GROK_CODE_XAI_API_KEY="$token"
   setsid -w grok logout </dev/null >/dev/null 2>&1 || true
 fi
 
