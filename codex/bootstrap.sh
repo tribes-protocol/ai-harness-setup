@@ -46,7 +46,11 @@ fi
 #      own provider/creds while staying auto-approved + trusted. No raw
 #      __TRIBES_* placeholders survive either way.
 # Done with `bun` (smol-toml) for a robust structured edit, not fragile sed.
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
+# Gate on a mintable bearer (ES256 JWT from the in-VM P-256 key, via
+# tribes-agent-token) so a keyless BYO/external box strips the proxy bits below;
+# the token itself is env-only for codex (OPENAI_API_KEY, exported in launch.sh).
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" "$HOME/.codex/config.toml"
   sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" "$HOME/.codex/config.toml"
 elif [ -e "$HOME/.codex/config.toml" ]; then

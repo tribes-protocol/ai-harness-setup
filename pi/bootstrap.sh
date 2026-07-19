@@ -45,9 +45,12 @@ fi
 # GET /models transient self-heals next boot instead of being baked in permanently).
 # Here we only SEED models.json with the single default model, so the file is valid
 # + usable before launch.sh's first fetch and never traps a raw placeholder.
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
+# Mint the per-sandbox LLM-proxy bearer: a short ES256 JWT signed by the in-VM
+# P-256 agent key (tribes-agent-token). Empty on a keyless BYO/external box, so the
+# proxy fill is skipped and pi falls back to the user's own provider/creds.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
-  token="$TRIBES_API_KEY"
 
   # Seed the array CONTENTS for "models": [ ... ] with the default model only;
   # launch.sh replaces this with the live catalog on the first (and every) boot.

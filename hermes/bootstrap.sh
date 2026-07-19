@@ -99,9 +99,10 @@ fi
 # append /chat/completions to `api`. We omit a provider `models` list so the picker
 # discovers the full catalog from the proxy's GET /models; model.default preselects
 # ours. Skip gracefully if the proxy env is absent (CLI falls back to user creds).
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" "$HOME/.hermes/config.yaml"
-  sed -i "s|__TRIBES_TOKEN__|$TRIBES_API_KEY|g" "$HOME/.hermes/config.yaml"
+  sed -i "s|__TRIBES_TOKEN__|$token|g" "$HOME/.hermes/config.yaml"
   sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" "$HOME/.hermes/config.yaml"
   # Resolve the create-time skin now so no __TRIBES_SKIN__ placeholder reaches the
   # safety net below (launch.sh still re-seds the generic `skin:` line each launch

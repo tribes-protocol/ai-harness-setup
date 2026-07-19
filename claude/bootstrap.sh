@@ -60,7 +60,10 @@ fi
 #      specifically so that fallback's line range (open brace to matching close)
 #      is unambiguous.
 CFG="$HOME/.claude/settings.json"
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ] && [ -e "$CFG" ]; then
+# Mint the per-sandbox LLM-proxy bearer (ES256 JWT from the in-VM P-256 key).
+# Empty on a keyless BYO/external box → the env block is stripped below.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ] && [ -e "$CFG" ]; then
   fill() {
     # fill <file> <placeholder> <value>
     awk -v ph="$2" -v val="$3" '
@@ -70,7 +73,7 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY
     ' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
   }
   fill "$CFG" "__TRIBES_PROXY__" "${API_BASE_URL}/llm/proxy"
-  fill "$CFG" "__TRIBES_TOKEN__" "$TRIBES_API_KEY"
+  fill "$CFG" "__TRIBES_TOKEN__" "$token"
   fill "$CFG" "__TRIBES_MODEL__" "$TRIBES_LLM_MODEL"
 elif [ -e "$CFG" ]; then
   command -v bun >/dev/null 2>&1 && bun -e '

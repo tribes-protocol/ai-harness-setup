@@ -35,9 +35,17 @@ committed (see below). This keeps each harness's config visible and editable in 
 Put these PLACEHOLDER tokens in the committed config files and let `sed` fill them:
 
 - `__TRIBES_PROXY__`  → `${API_BASE_URL}/llm/proxy`  (the metered LLM proxy base)
-- `__TRIBES_TOKEN__`  → `$TRIBES_API_KEY`            (per-sandbox secret bearer)
+- `__TRIBES_TOKEN__`  → `$(tribes-agent-token)`      (per-sandbox bearer — see below)
 - `__TRIBES_MODEL__`  → `$TRIBES_LLM_MODEL`          (default model id)
 - `__TRIBES_THEME__`  → `light`/`dark` from `$TRIBES_THEME` (per-launch)
+
+The bearer is **minted in-VM**, not injected: `tribes-agent-token` (a baked CLI)
+prints a short-lived ES256 JWT signed with the sandbox's own P-256 agent key — the
+same key the box uses for `/agent/*`. The control plane validates it against the
+public key on the sandbox row and meters usage. `tribes-agent-token` prints nothing
+(non-zero exit) on a keyless BYO/external box, so an empty mint is the signal to
+skip the proxy config and fall back to the user's own creds. The static
+`TRIBES_API_KEY` env var is retired — no harness reads it.
 
 The ONE thing that needs a runtime fetch (not a sed): the **live model catalog** for
 harnesses that can't auto-discover a custom provider (openclaw/opencode/pi embed the
@@ -60,9 +68,9 @@ harnesses that can't auto-discover a custom provider (openclaw/opencode/pi embed
 - `AGENTS.md`     — copy of the repo-root `AGENTS.md`. Add `CLAUDE.md` (same content)
   if the harness reads CLAUDE.md.
 
-Guard the sed/proxy steps so an unset proxy env leaves the harness on the user's own
-key: skip filling proxy placeholders when `TRIBES_LLM_MODEL`/`API_BASE_URL`/`TRIBES_API_KEY`
-are empty.
+Guard the sed/proxy steps so a keyless box leaves the harness on the user's own key:
+mint `token="$(tribes-agent-token 2>/dev/null || true)"` and skip filling proxy
+placeholders when `TRIBES_LLM_MODEL`/`API_BASE_URL`/`$token` are empty.
 
 ## CRITICAL: env-vars vs files split
 
@@ -77,34 +85,35 @@ is LOST before the harness launches. Therefore:
   **launch.sh**, right before `exec`, because only that process's env reaches the
   harness.
 
-## CRITICAL: the proxy TOKEN must be refreshed every launch (restore-safety)
+## CRITICAL: the proxy TOKEN must be refreshed every launch
 
-`TRIBES_API_KEY` is the one runtime value that can **change across boots of the same
-disk**. A pause archives the disk to R2; a restore boots that disk again but the
-control plane **RE-MINTS** the per-sandbox key — it REVOKES the old token and injects
-a fresh `TRIBES_API_KEY` on the boot cmdline. The proxy rejects the revoked token
-(401), so a box restored with its first-boot token baked into a config file comes
-back with a dead LLM key.
+The bearer is a **short-lived ES256 JWT** (`tribes-agent-token` mints it with a
+~7-day TTL). It is minted in-VM from the sandbox's P-256 agent key, which is STABLE
+across a pause/restore — so unlike the old injected static key, nothing on the
+control plane re-mints it. But the token baked into a config file at first boot
+still goes stale two ways: it EXPIRES, and a PAUSE -> RESTORE boots a disk that
+holds the previous boot's (older) JWT — which the proxy then rejects (401).
 
 Therefore a **file-based** harness (one whose token lives in an on-disk config, not an
-env export) MUST re-apply the live token in **launch.sh** on every launch — not only
-in `bootstrap.sh` (which runs once). The proxy URL, model, and embedded catalog do
-NOT change on restore, so they stay seeded in `bootstrap.sh`; only the token is
-refreshed per launch. Idiomatically, mirror the per-launch theme re-`sed`:
+env export) MUST re-mint and re-apply the token in **launch.sh** on every launch — not
+only in `bootstrap.sh` (which runs once). The proxy URL, model, and embedded catalog do
+NOT change, so they stay seeded in `bootstrap.sh`; only the token is refreshed per
+launch. Target the credential FIELD (not the old `tribes_sb_...` token pattern — a JWT
+does not match it); a JWT carries no sed-special chars, so the swap is safe:
 
 ```sh
-# Re-point the on-disk apiKey at the live cmdline token (the proxy token is
-# tribes_sb_...). No-op on a cold boot; skipped on BYO/unset. $HOME-relative —
-# see the hard rule below.
+# Re-point the on-disk apiKey at a freshly-minted bearer. No-op on a cold boot;
+# skipped on a keyless BYO/unset box. $HOME-relative — see the hard rule below.
 CFG="$HOME/.<harness>/config.json"
-if [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
-  sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$CFG"
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$token" ] && [ -f "$CFG" ]; then
+  sed -i "s|\"apiKey\": \"[^\"]*\"|\"apiKey\": \"$token\"|" "$CFG"
 fi
 ```
 
 `cline` (whose token lives in a binary-managed provider file) instead re-runs its
 `cline auth ...` command in `launch.sh` every boot. **env-based** harnesses
-(`codex`/`grok`) already export the live `TRIBES_API_KEY` each launch, so the
+(`codex`/`grok`) mint + export a fresh bearer each launch, so the
 LAUNCHED harness is restore-safe by construction — but that export dies with
 `launch.sh`'s process and is invisible to a manual invocation of the harness
 binary typed later in the dispatcher's exit shell (a real, supported access
@@ -123,12 +132,13 @@ here). Covered by `test/launch-token-refresh.test.sh`.
 
 - `TRIBES_LLM_MODEL` — the default model id to preselect (e.g. `deepseek-v4-flash`)
 - `API_BASE_URL`     — control-plane base; the metered LLM proxy is `${API_BASE_URL}/llm/proxy`
-- `TRIBES_API_KEY`   — the per-sandbox static bearer the proxy verifies (the proxy token)
 - `TRIBES_THEME`     — `light` or `dark` (the browser's theme at create time)
 - `HOSTNAME`         — the VM's public subdomain host (for AGENTS.md `__HOST__`)
 
-The proxy URL is `proxy="${API_BASE_URL}/llm/proxy"`, the token is `"$TRIBES_API_KEY"`.
-Model discovery for the picker is `GET ${proxy}/models` with `Authorization: Bearer $TRIBES_API_KEY`.
+The per-sandbox bearer is NOT an injected env var — mint it in-VM with
+`token="$(tribes-agent-token 2>/dev/null || true)"` (empty on a keyless box).
+The proxy URL is `proxy="${API_BASE_URL}/llm/proxy"`; model discovery for the picker
+is `GET ${proxy}/models` with `Authorization: Bearer $token`.
 
 ## Rules
 

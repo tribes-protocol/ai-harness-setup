@@ -8,11 +8,10 @@
 
 # --- (re)generate models.json from the LIVE env every boot ------------------
 # Two problems this fixes, both from doing it ONCE in bootstrap.sh:
-#   1. restore-safety: a PAUSE -> RESTORE re-mints the per-sandbox key — the
-#      control plane REVOKES the old TRIBES_API_KEY and injects a fresh one on the
-#      boot cmdline, while the restored disk still holds the OLD, now-revoked
-#      token. Pi would present a dead key and the proxy 401s. Regenerating with the
-#      live cmdline env re-points apiKey at the current token.
+#   1. token freshness: the bearer is a short-lived ES256 JWT minted in-VM by
+#      tribes-agent-token (signed with the P-256 agent key). Re-minting every launch
+#      keeps the on-disk apiKey a live, unexpired token — including after a PAUSE ->
+#      RESTORE, where the disk still holds the previous boot's now-stale JWT.
 #   2. empty-catalog self-heal: the catalog comes from an authenticated GET
 #      /models; a first-boot empty/401 fetch would otherwise be BAKED IN forever
 #      ("No models available"). Re-fetching every boot lets the next boot recover,
@@ -40,9 +39,9 @@ else
 fi
 
 CFG="$HOME/.pi/agent/models.json"
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ] && [ -f "$CFG" ]; then
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ] && [ -f "$CFG" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
-  token="$TRIBES_API_KEY"
 
   # Live catalog → the array CONTENTS for "models": [ ... ]. Fall back to the
   # single default model on an empty/failed fetch — NEVER an empty array.
@@ -64,5 +63,34 @@ fi
 # failed fetch leaves the launch (and any prior install) unaffected.
 SKILLS_RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
 curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+
+# --- close the direct-provider escape hatch (#2255) --------------------------
+# On a proxy-routed box the control plane injects a PLACEHOLDER OPENROUTER_API_KEY
+# (SandboxBootEnv.ts) intended for an egress injector that swaps in the real key.
+# On zipbox no such injector is on this path, so the placeholder is just a stray
+# credential-shaped env var: harnesses that auto-register a provider on env
+# presence alone (pi, opencode) can pick OpenRouter DIRECTLY and 401 against
+# openrouter.ai instead of using the metered proxy. Dropping it before exec leaves
+# the metered proxy as the only route the harness can see.
+#
+# We do NOT set HTTP_PROXY/HTTPS_PROXY: the forwarder catalog is a CONNECT
+# allowlist that 403s every non-catalog authority, so a blanket proxy would break
+# github/npm/apt/pypi on every box.
+#
+# The unset is deliberately guard-scoped, NOT value-scoped (i.e. not "unset only
+# if it looks like the placeholder"). Value-matching would couple this script to a
+# literal defined in another repo's catalog — a silent no-op the day that value
+# changes — and, worse, it would PRESERVE a real OpenRouter key that reached a
+# proxy-routed box some other way, which is exactly the unmetered bypass this
+# closes. byoKey is the supported way to bring your own key, and it is suppressed
+# by the guard below.
+#
+# The guard is the by-construction one: SandboxBootEnv writes TRIBES_LLM_MODEL
+# ONLY for proxy-mode, non-byoKey, non-'external' boxes, so BYO/external boxes
+# never enter this branch and keep their own OPENROUTER_API_KEY untouched. This is
+# structural, not a special case — do not add a byoKey conditional here.
+if [ -n "${TRIBES_LLM_MODEL:-}" ] && [ -n "${API_BASE_URL:-}" ]; then
+  unset OPENROUTER_API_KEY
+fi
 
 exec pi

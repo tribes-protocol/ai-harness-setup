@@ -35,14 +35,15 @@ if [ -f "$HOME/.hermes/config.yaml" ]; then
 fi
 
 # --- restore-safety: refresh the proxy token from the LIVE env --------------
-# bootstrap.sh baked TRIBES_API_KEY (api_key) into config.yaml ONCE, on first
-# boot. A PAUSE -> RESTORE re-mints the per-sandbox key (the old token is REVOKED
-# and a fresh TRIBES_API_KEY rides the boot cmdline), but the restored disk still
-# holds the OLD, now-revoked token — so hermes would 401 against the proxy.
-# launch.sh runs EVERY boot with the live env, so re-point the on-disk api_key at
-# the current token here. No-op on a cold boot; skipped on BYO/unset.
-if [ -n "$TRIBES_API_KEY" ] && [ -f "$HOME/.hermes/config.yaml" ]; then
-  sed -i "s|tribes_sb_[0-9A-Za-z]*|$TRIBES_API_KEY|g" "$HOME/.hermes/config.yaml"
+# The bearer is a short-lived ES256 JWT minted in-VM by tribes-agent-token (signed
+# with the P-256 agent key). bootstrap.sh baked one into config.yaml (api_key) on
+# first boot; it goes stale (expiry, or a PAUSE -> RESTORE onto a disk holding the
+# previous boot's token), so re-mint and re-point the on-disk api_key every launch.
+# Match the api_key field value so the swap works for any prior token (a JWT has no
+# sed-special chars). No-op on a cold boot; skipped on a keyless BYO/unset box.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$token" ] && [ -f "$HOME/.hermes/config.yaml" ]; then
+  sed -i "s|api_key: \"[^\"]*\"|api_key: \"$token\"|" "$HOME/.hermes/config.yaml"
 fi
 
 # --- seal the venv against banner-time lazy installs ------------------------
@@ -67,7 +68,7 @@ export HERMES_DISABLE_LAZY_INSTALLS=1
 # bring-your-own-keys). The /opt/tribes marker keeps a user who backs out from
 # being re-trapped on every relaunch (they can rerun `hermes setup` anytime),
 # and a completed setup writes providers into config.yaml, which also skips.
-if [ -z "$TRIBES_API_KEY" ] \
+if [ -z "$token" ] \
    && ! grep -q '^providers:' "$HOME/.hermes/config.yaml" 2>/dev/null \
    && [ ! -e /opt/tribes/.hermes-setup-offered ]; then
   mkdir -p /opt/tribes && : > /opt/tribes/.hermes-setup-offered
@@ -80,5 +81,34 @@ fi
 # failed fetch leaves the launch (and any prior install) unaffected.
 SKILLS_RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
 curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+
+# --- close the direct-provider escape hatch (#2255) --------------------------
+# On a proxy-routed box the control plane injects a PLACEHOLDER OPENROUTER_API_KEY
+# (SandboxBootEnv.ts) intended for an egress injector that swaps in the real key.
+# On zipbox no such injector is on this path, so the placeholder is just a stray
+# credential-shaped env var: harnesses that auto-register a provider on env
+# presence alone (pi, opencode) can pick OpenRouter DIRECTLY and 401 against
+# openrouter.ai instead of using the metered proxy. Dropping it before exec leaves
+# the metered proxy as the only route the harness can see.
+#
+# We do NOT set HTTP_PROXY/HTTPS_PROXY: the forwarder catalog is a CONNECT
+# allowlist that 403s every non-catalog authority, so a blanket proxy would break
+# github/npm/apt/pypi on every box.
+#
+# The unset is deliberately guard-scoped, NOT value-scoped (i.e. not "unset only
+# if it looks like the placeholder"). Value-matching would couple this script to a
+# literal defined in another repo's catalog — a silent no-op the day that value
+# changes — and, worse, it would PRESERVE a real OpenRouter key that reached a
+# proxy-routed box some other way, which is exactly the unmetered bypass this
+# closes. byoKey is the supported way to bring your own key, and it is suppressed
+# by the guard below.
+#
+# The guard is the by-construction one: SandboxBootEnv writes TRIBES_LLM_MODEL
+# ONLY for proxy-mode, non-byoKey, non-'external' boxes, so BYO/external boxes
+# never enter this branch and keep their own OPENROUTER_API_KEY untouched. This is
+# structural, not a special case — do not add a byoKey conditional here.
+if [ -n "${TRIBES_LLM_MODEL:-}" ] && [ -n "${API_BASE_URL:-}" ]; then
+  unset OPENROUTER_API_KEY
+fi
 
 exec hermes --yolo

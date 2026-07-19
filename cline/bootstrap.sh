@@ -11,10 +11,10 @@
 # there is no static file to commit (no heredoc to convert to a seed file).
 #
 # Installs the Cline CLI ONLY. The `cline auth` command that writes the provider
-# file is NOT here — it lives in launch.sh and runs EVERY boot, so a PAUSE ->
-# RESTORE re-auths with the freshly re-minted TRIBES_API_KEY (the token a restore
-# re-mints would otherwise stay the stale, revoked one baked at first boot). Cline
-# has no env-based proxy config and no theme support (hardcoded palette).
+# file is NOT here — it lives in launch.sh and runs EVERY boot, so each launch
+# re-auths with a freshly-minted bearer (tribes-agent-token; a stale token baked
+# at first boot would otherwise 401 after a restore). Cline has no env-based proxy
+# config and no theme support (hardcoded palette).
 set -e
 
 # --- install ----------------------------------------------------------------

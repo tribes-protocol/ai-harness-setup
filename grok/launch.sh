@@ -42,13 +42,16 @@ mkdir -p "$HOME/.grok"
 sed -i "s|theme = \"[^\"]*\"|theme = \"$theme\"|" "$HOME/.grok/config.toml"
 
 # --- proxy (ENV-only for grok) ----------------------------------------------
-# grok CLI → OpenAI chat surface via its base-url override. An existing session
-# beats the key, so log out first. Under `setsid -w` (own session, no controlling
-# tty) so the grok binary can't grab/leave the pty's foreground group
-# backgrounded; -w waits so creds are cleared before grok starts.
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
+# grok CLI → OpenAI chat surface via its base-url override. The bearer is minted
+# in-VM by tribes-agent-token (an ES256 JWT signed with the P-256 agent key); it is
+# empty on a keyless BYO/external box, so grok then falls back to the user's own
+# xAI account. An existing session beats the key, so log out first. Under
+# `setsid -w` (own session, no controlling tty) so the grok binary can't grab/leave
+# the pty's foreground group backgrounded; -w waits so creds are cleared before grok starts.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   export GROK_MODELS_BASE_URL="${API_BASE_URL}/llm/proxy"
-  export GROK_CODE_XAI_API_KEY="$TRIBES_API_KEY"
+  export GROK_CODE_XAI_API_KEY="$token"
   setsid -w grok logout </dev/null >/dev/null 2>&1 || true
 fi
 
@@ -71,6 +74,35 @@ done
 # failed fetch leaves the launch (and any prior install) unaffected.
 SKILLS_RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
 curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+
+# --- close the direct-provider escape hatch (#2255) --------------------------
+# On a proxy-routed box the control plane injects a PLACEHOLDER OPENROUTER_API_KEY
+# (SandboxBootEnv.ts) intended for an egress injector that swaps in the real key.
+# On zipbox no such injector is on this path, so the placeholder is just a stray
+# credential-shaped env var: harnesses that auto-register a provider on env
+# presence alone (pi, opencode) can pick OpenRouter DIRECTLY and 401 against
+# openrouter.ai instead of using the metered proxy. Dropping it before exec leaves
+# the metered proxy as the only route the harness can see.
+#
+# We do NOT set HTTP_PROXY/HTTPS_PROXY: the forwarder catalog is a CONNECT
+# allowlist that 403s every non-catalog authority, so a blanket proxy would break
+# github/npm/apt/pypi on every box.
+#
+# The unset is deliberately guard-scoped, NOT value-scoped (i.e. not "unset only
+# if it looks like the placeholder"). Value-matching would couple this script to a
+# literal defined in another repo's catalog — a silent no-op the day that value
+# changes — and, worse, it would PRESERVE a real OpenRouter key that reached a
+# proxy-routed box some other way, which is exactly the unmetered bypass this
+# closes. byoKey is the supported way to bring your own key, and it is suppressed
+# by the guard below.
+#
+# The guard is the by-construction one: SandboxBootEnv writes TRIBES_LLM_MODEL
+# ONLY for proxy-mode, non-byoKey, non-'external' boxes, so BYO/external boxes
+# never enter this branch and keep their own OPENROUTER_API_KEY untouched. This is
+# structural, not a special case — do not add a byoKey conditional here.
+if [ -n "${TRIBES_LLM_MODEL:-}" ] && [ -n "${API_BASE_URL:-}" ]; then
+  unset OPENROUTER_API_KEY
+fi
 
 # --- launch -----------------------------------------------------------------
 # --always-approve disables per-tool approval prompts (no trust gate exists in
