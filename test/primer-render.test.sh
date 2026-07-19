@@ -139,5 +139,37 @@ else
   fail "a missing template leaves the existing primer intact"
 fi
 
+# ── 8/9. THE BUG THAT SHIPPED INERT ──────────────────────────────────────────
+# bootstrap.sh and render-primer.sh resolved their fetch ref from HOST_HARNESS_REF
+# — the HOST DAEMON's variable name, which is NEVER injected into the guest. The
+# guest only ever sees TRIBES_HARNESS_REF. So every runtime fetch silently fell
+# back to `main`, regardless of the pin: a box pinned to a tag fetched main's
+# AGENTS.md and 404'd on main/render-primer.sh, leaving the primer un-rendered on
+# EVERY box. The pin, the immutable tag, the freeze and the pool drain were all
+# defeated by this one name. These assert the guest variable WINS.
+fails_before=$fails
+
+for f in "$REPO"/*/bootstrap.sh "$REPO/render-primer.sh"; do
+  name="${f#$REPO/}"
+  # Must consult the guest var. A bare HOST_HARNESS_REF reader is the bug.
+  if grep -q 'TRIBES_HARNESS_REF:-\${HOST_HARNESS_REF:-main}' "$f" 2>/dev/null; then
+    :
+  elif grep -q 'HOST_HARNESS_REF:-main' "$f" 2>/dev/null; then
+    fail "$name resolves its ref from HOST_HARNESS_REF (host-only var — never set in the guest)"
+  fi
+done
+[ "$fails" -eq "$fails_before" ] && pass "every in-guest ref resolver prefers TRIBES_HARNESS_REF over the host-only name"
+
+# The renderer must never be invoked with its errors discarded: `2>/dev/null || true`
+# on a MISSING dependency converts "was never installed" into silence, which is why
+# this survived review, a Fable pass and four ref moves.
+fails_before=$fails
+for f in "$REPO"/*/launch.sh; do
+  name="${f#$REPO/}"
+  grep -q 'render-primer.sh 2>/dev/null || true' "$f" 2>/dev/null &&
+    fail "$name silently swallows a missing/failing render-primer.sh"
+done
+[ "$fails" -eq "$fails_before" ] && pass "a missing or failing renderer is reported, never silently swallowed"
+
 [ "$fails" -eq 0 ] || { printf '\n%s test(s) failed\n' "$fails"; exit 1; }
 printf '\nall primer-render tests passed\n'

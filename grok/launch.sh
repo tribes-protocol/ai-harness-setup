@@ -24,7 +24,16 @@
 # bound yet. AGENTS.md is auto-loaded into the agent's context, so a frozen primer
 # feeds it a WRONG public URL by default. Re-render from the untouched template
 # with this launch's live env so both self-heal and survive restore.
-sh /opt/tribes/render-primer.sh 2>/dev/null || true
+if [ -e /opt/tribes/render-primer.sh ]; then
+  sh /opt/tribes/render-primer.sh ||
+    echo "[primer] render-primer.sh FAILED — primer may be stale" >&2
+else
+  # Loud on purpose: `2>/dev/null || true` here once turned "my dependency was
+  # never installed" into silence, and the primer fix sat INERT on every box
+  # through review, a Fable pass and four ref moves. A missing renderer means the
+  # harness install fetched the wrong ref — say so.
+  echo "[primer] /opt/tribes/render-primer.sh MISSING — primer NOT refreshed (harness install incomplete / wrong ref?)" >&2
+fi
 
 theme="$(cat /run/tribes-theme 2>/dev/null)"
 [ "$theme" = light ] || [ "$theme" = dark ] || theme=$([ "$TRIBES_THEME" = light ] && echo light || echo dark)

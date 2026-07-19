@@ -38,7 +38,7 @@ TEMPLATE="${TRIBES_PRIMER_TEMPLATE:-/opt/tribes/AGENTS.md.tmpl}"
 # interactive boot path); fetch only when it's missing.
 if [ ! -s "$TEMPLATE" ]; then
   RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-  REF="${HOST_HARNESS_REF:-main}"
+  REF="${TRIBES_HARNESS_REF:-${HOST_HARNESS_REF:-main}}"
   mkdir -p "$(dirname "$TEMPLATE")" 2>/dev/null || true
   curl -fsSL "$RAW_BASE/$REF/AGENTS.md" -o "$TEMPLATE.part" 2>/dev/null &&
     [ -s "$TEMPLATE.part" ] && mv "$TEMPLATE.part" "$TEMPLATE" || rm -f "$TEMPLATE.part"
