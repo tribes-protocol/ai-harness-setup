@@ -25,6 +25,7 @@ zipbox-caddy
 zipbox-dns
 zipbox-egress
 zipbox-email
+zipbox-wallet
 zipbox-websearch"
 
 fail() {
