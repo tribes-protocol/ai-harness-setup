@@ -14,16 +14,25 @@ command -v codex >/dev/null 2>&1 ||
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
-host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
-[ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
-# Identity block (email/EVM/SOL) — same substitution as __HOST__ above; "none"
-# when this boot has no bound agent_identities row (composeSandboxBootEnv omits
-# the env var for a non-identity box).
-email="${TRIBES_IDENTITY_EMAIL:-none}"
-evm="${TRIBES_IDENTITY_EVM_ADDRESS:-none}"
-sol="${TRIBES_IDENTITY_SOL_ADDRESS:-none}"
-[ -e /root/workspace/AGENTS.md ] && sed -i "s|__EMAIL__|$email|g; s|__EVM__|$evm|g; s|__SOL__|$sol|g" /root/workspace/AGENTS.md
+REF="${TRIBES_HARNESS_REF:-${HOST_HARNESS_REF:-main}}"
+# Cache the PLACEHOLDER-BEARING primer + the renderer outside the workspace, then
+# render. Bootstrap runs ONCE and its sed consumes the placeholders, so stamping
+# them here alone froze the wrong values for the life of the disk: the guest's
+# hostname is the boot slug (a claim never renames the VM), and a box bootstrapped
+# before its identity row is bound has no TRIBES_IDENTITY_* and froze "none".
+# launch.sh re-runs the renderer every launch so both self-heal.
+mkdir -p /opt/tribes 2>/dev/null || true
+curl -fsSL "$RAW_BASE/$REF/AGENTS.md" -o /opt/tribes/AGENTS.md.tmpl 2>/dev/null || true
+# Fetch LOUDLY: a 404 here (e.g. the ref lacks this file) previously fell
+# through silently and left the primer un-rendered on every box, which is
+# exactly how this shipped inert. Report the ref so the cause is obvious.
+if curl -fsSL "$RAW_BASE/$REF/render-primer.sh" -o /opt/tribes/render-primer.sh 2>/dev/null; then
+  chmod +x /opt/tribes/render-primer.sh 2>/dev/null || true
+  sh /opt/tribes/render-primer.sh ||
+    echo "[primer] render-primer.sh FAILED on first boot" >&2
+else
+  echo "[primer] could not fetch render-primer.sh from ref '$REF' — primer NOT rendered" >&2
+fi
 
 # --- config -----------------------------------------------------------------
 # The committed seed .codex/config.toml has two layers:
