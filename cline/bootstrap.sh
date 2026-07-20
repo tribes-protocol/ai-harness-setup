@@ -27,19 +27,13 @@ RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-h
 curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
 host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 [ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
-# Fill the sandbox's own mailbox address the same way as __HOST__. Unlike the
-# hostname it is not a boot env var (different apex, per-sandbox), so read it from
-# the baked tribes-email CLI — the same source the zipbox-email skill uses. Drop
-# the line when no address is available (older, pre-email sandboxes) so no raw
-# placeholder survives.
-if [ -e /root/workspace/AGENTS.md ]; then
-  email="$(tribes-email status 2>/dev/null | grep -oE '"address"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\\1/' | head -n1)"
-  if [ -n "$email" ]; then
-    sed -i "s|__EMAIL__|$email|g" /root/workspace/AGENTS.md
-  else
-    sed -i "/__EMAIL__/d" /root/workspace/AGENTS.md
-  fi
-fi
+# Identity block (email/EVM/SOL) — same substitution as __HOST__ above; "none"
+# when this boot has no bound agent_identities row (composeSandboxBootEnv omits
+# the env var for a non-identity box).
+email="${TRIBES_IDENTITY_EMAIL:-none}"
+evm="${TRIBES_IDENTITY_EVM_ADDRESS:-none}"
+sol="${TRIBES_IDENTITY_SOL_ADDRESS:-none}"
+[ -e /root/workspace/AGENTS.md ] && sed -i "s|__EMAIL__|$email|g; s|__EVM__|$evm|g; s|__SOL__|$sol|g" /root/workspace/AGENTS.md
 
 # --- proxy-routed config: see launch.sh -------------------------------------
 # The `cline auth openai-compatible ...` command that writes cline's provider
