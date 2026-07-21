@@ -17,6 +17,8 @@ jobs:
         run: sh test/launch-token-refresh.test.sh
       - name: Primer render (host/identity self-heal)
         run: sh test/primer-render.test.sh
+      - name: launch.sh surfaces a proxy-routed box with no credential (#2472)
+        run: sh test/launch-proxy-auth-missing.test.sh
       - name: skills authoring contract (mirrors the downstream consumer)
         run: sh test/skills-contract.test.sh
       - name: shared skills installation contract
