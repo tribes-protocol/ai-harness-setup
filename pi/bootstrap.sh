@@ -18,9 +18,25 @@ command -v pi >/dev/null 2>&1 ||
 # --- seed the shared agent primer -------------------------------------------
 # Seed the shared agent primer from the repo root (single source of truth).
 RAW_BASE="$(echo "${TRIBES_HARNESS_REPO:-https://github.com/tribes-protocol/ai-harness-setup}" | sed 's#//github\.com#//raw.githubusercontent.com#')"
-curl -fsSL "$RAW_BASE/main/AGENTS.md" -o /root/workspace/AGENTS.md 2>/dev/null || true
-host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
-[ -n "$host" ] && [ -e /root/workspace/AGENTS.md ] && sed -i "s|__HOST__|$host|g" /root/workspace/AGENTS.md
+REF="${TRIBES_HARNESS_REF:-${HOST_HARNESS_REF:-main}}"
+# Cache the PLACEHOLDER-BEARING primer + the renderer outside the workspace, then
+# render. Bootstrap runs ONCE and its sed consumes the placeholders, so stamping
+# them here alone froze the wrong values for the life of the disk: the guest's
+# hostname is the boot slug (a claim never renames the VM), and a box bootstrapped
+# before its identity row is bound has no TRIBES_IDENTITY_* and froze "none".
+# launch.sh re-runs the renderer every launch so both self-heal.
+mkdir -p /opt/tribes 2>/dev/null || true
+curl -fsSL "$RAW_BASE/$REF/AGENTS.md" -o /opt/tribes/AGENTS.md.tmpl 2>/dev/null || true
+# Fetch LOUDLY: a 404 here (e.g. the ref lacks this file) previously fell
+# through silently and left the primer un-rendered on every box, which is
+# exactly how this shipped inert. Report the ref so the cause is obvious.
+if curl -fsSL "$RAW_BASE/$REF/render-primer.sh" -o /opt/tribes/render-primer.sh 2>/dev/null; then
+  chmod +x /opt/tribes/render-primer.sh 2>/dev/null || true
+  sh /opt/tribes/render-primer.sh ||
+    echo "[primer] render-primer.sh FAILED on first boot" >&2
+else
+  echo "[primer] could not fetch render-primer.sh from ref '$REF' — primer NOT rendered" >&2
+fi
 
 # --- proxy-routed config ----------------------------------------------------
 # Pi → an openai-completions provider declared in models.json. Pi does NOT
@@ -29,9 +45,12 @@ host="${HOSTNAME:-$(hostname 2>/dev/null || true)}"
 # GET /models transient self-heals next boot instead of being baked in permanently).
 # Here we only SEED models.json with the single default model, so the file is valid
 # + usable before launch.sh's first fetch and never traps a raw placeholder.
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$TRIBES_API_KEY" ]; then
+# Mint the per-sandbox LLM-proxy bearer: a short ES256 JWT signed by the in-VM
+# P-256 agent key (tribes-agent-token). Empty on a keyless BYO/external box, so the
+# proxy fill is skipped and pi falls back to the user's own provider/creds.
+token="$(tribes-agent-token 2>/dev/null || true)"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
   proxy="${API_BASE_URL}/llm/proxy"
-  token="$TRIBES_API_KEY"
 
   # Seed the array CONTENTS for "models": [ ... ] with the default model only;
   # launch.sh replaces this with the live catalog on the first (and every) boot.
@@ -76,7 +95,7 @@ fi
 # --- safety net -------------------------------------------------------------
 # Belt-and-suspenders: no file under /root/workspace may survive with a raw
 # __TRIBES_* placeholder (broken/invalid config). AGENTS.md only carries
-# __HOST__, so it is not matched.
+# __HOST__ and __EMAIL__ (both filled above), so it is not matched.
 # NEVER delete *.sh — bootstrap.sh/launch.sh legitimately contain __TRIBES_ in
 # their sed patterns/fallbacks; only NON-script files with a raw placeholder are
 # broken config and get removed.
@@ -84,8 +103,17 @@ grep -rl "__TRIBES_" /root/workspace "$HOME/.pi" 2>/dev/null | while IFS= read -
   case "$f" in *.sh) ;; *) rm -f "$f" ;; esac
 done
 
-# --- shared agent skills (single source of truth, refreshed at boot) --------
-# Install the published skill set read-only under /root/skills and wire the native
-# (claude/pi) or AGENTS.md loaders. Runs after all config writes; fully
-# tolerant, so it never blocks or fails the boot.
-curl -fsSL --max-time 20 "$RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+# --- shared agent skills (single source of truth, installed at boot) --------
+# Install the skill set read-only under /root/skills and wire the native
+# (claude/pi) or AGENTS.md loaders. Drive-first (#1914): the shared read-only
+# /opt/harnesses drive bakes the pinned catalog AND this installer, so a stock
+# boot runs the baked copy and needs no network for skills. The installer is
+# fetched only when the drive predates skills (old image, dev backend) or a
+# pinned TRIBES_HARNESS_REF (QA) must exercise that branch's own installer.
+# Runs after all config writes; fully tolerant, so it never blocks or fails
+# the boot.
+if [ -z "${TRIBES_HARNESS_REF:-}" ] && [ -f /opt/harnesses/skills/install-skills.sh ]; then
+  sh /opt/harnesses/skills/install-skills.sh || true
+else
+  curl -fsSL --max-time 20 "$RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
+fi
