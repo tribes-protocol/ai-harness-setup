@@ -155,6 +155,6 @@ is `GET ${proxy}/models` with `Authorization: Bearer $token`.
 - Idempotent + tolerant: a missing optional tool or a failed catalog fetch must not
   abort the script (`|| true`, fallbacks). The VM is the security boundary, so every
   harness must be fully non-interactive (auto-approve / trust the workspace).
-- If `TRIBES_LLM_MODEL`/`API_BASE_URL`/`TRIBES_API_KEY` are empty, skip the proxy
-  config gracefully (the harness falls back to the user's own key) — mirror the old
-  `configure_llm_proxy` guard `[ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] || return 0`.
+- If `TRIBES_LLM_MODEL`/`API_BASE_URL` are empty or `tribes-agent-token` mints nothing,
+  skip the proxy config gracefully (the harness falls back to the user's own key) — mirror
+  the old `configure_llm_proxy` guard `[ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] || return 0`.
