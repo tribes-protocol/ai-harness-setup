@@ -17,6 +17,8 @@ jobs:
         run: sh test/launch-token-refresh.test.sh
       - name: Pi live catalog uses the selected egress mode
         run: sh test/pi-catalog-egress.test.sh
+      - name: Bootstrap catalogs use the selected egress mode
+        run: sh test/bootstrap-catalog-egress.test.sh
       - name: Primer render (host/identity self-heal)
         run: sh test/primer-render.test.sh
       - name: skills authoring contract (mirrors the downstream consumer)
