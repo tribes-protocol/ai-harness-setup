@@ -129,3 +129,19 @@ restore only the invalid authorization scheme; each mutation must be exercised
 and rejected for both bootstraps. Keep the existing Pi mode/fallback/BYO/security
 and independent-mutation proof green, wire all new coverage into CI, and rerun
 the full serial low-priority shell suite.
+
+## CI correction amendment — portable production-block extraction
+
+PR #35 run `30041341760` proved the product changes and Pi suite green, then
+failed the new bootstrap suite before exercising either production block.
+Ubuntu's `awk` warns that `\$` is not a portable string escape and treats it as a
+plain dollar sign; the resulting regular-expression start marker matches
+neither bootstrap. The local awk implementation accepted that escape, so this is
+a deterministic cross-implementation test-fixture defect.
+
+Replace the two regex start markers with exact literal prefixes and select them
+using `index($0, start) == 1`. Do not change product code or weaken any mode,
+fallback, BYO, secret-output, or semantic-mutation assertion. First reproduce the
+failed extraction with the CI-compatible awk behavior where available, then run
+both catalog suites plus the full serial low-priority shell gates. Push and read
+back this plan-only amendment before editing the test fixture.
