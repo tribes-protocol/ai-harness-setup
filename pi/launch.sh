@@ -45,9 +45,15 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ] && [ -f "$CFG" ]; then
 
   # Live catalog → the array CONTENTS for "models": [ ... ]. Fall back to the
   # single default model on an empty/failed fetch — NEVER an empty array.
-  pi_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Placeholder $token" 2>/dev/null \
-    | grep -oE '"id":[[:space:]]*"[^"]+"' \
-    | sed -E 's/.*"([^"]+)"$/{ "id": "\1" }/' | paste -sd, -)
+  pi_models=$(
+    set -- -s --max-time 10
+    if [ -n "${ZIPBOX_EGRESS_PROXY_URL:-}" ]; then
+      set -- "$@" --proxy "$ZIPBOX_EGRESS_PROXY_URL"
+    fi
+    curl "$@" "$proxy/models" -H "Authorization: Bearer $token" 2>/dev/null |
+      grep -oE '"id":[[:space:]]*"[^"]+"' |
+      sed -E 's/.*"([^"]+)"$/{ "id": "\1" }/' | paste -sd, -
+  )
   [ -n "$pi_models" ] || pi_models="{ \"id\": \"$TRIBES_LLM_MODEL\" }"
 
   # Write atomically. printf only interprets the format string, so proxy/token/
