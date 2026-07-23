@@ -95,3 +95,37 @@ receipts to the release coordinator. Terminal #2603 may advance its immutable
 delivery pins only after root merges the external PR and supplies an exact
 descendant-of-`e80f825` merge SHA. This work records no live QA or certification
 PASS.
+
+## Scope amendment — OpenClaw and OpenCode bootstrap catalogs
+
+After the recoverable Pi implementation checkpoint
+`81e5f78647e4959562ec34b3f86fc0f51c6c7057`, the release coordinator expanded
+#34 to cover the two equivalent one-shot catalog defects found during the
+nine-launcher audit:
+
+- `openclaw/bootstrap.sh` sends its authenticated OpenRouter `/models` request
+  with the invalid `Placeholder` authorization scheme and no request-scoped
+  explicit proxy.
+- `opencode/bootstrap.sh` has the same invalid scheme and missing
+  request-scoped explicit proxy.
+
+These bootstraps must use the same safe argument construction as Pi: an exact
+`Authorization: Bearer $token` header in both egress modes and an exact
+`--proxy "$ZIPBOX_EGRESS_PROXY_URL"` argument only when the explicit proxy URL is
+present. They must not export a global proxy or route primer, package, skill, or
+other bootstrap traffic through the provider allowlist.
+
+Preserve each harness's existing catalog parsing and configured-model fallback.
+Transparent-MITM remains direct. BYO/external guards and their existing config
+cleanup/minimal-config behavior remain unchanged. Token and proxy values remain
+quoted arguments and must not appear in stdout, stderr, or test diagnostics.
+
+Add deterministic production-snippet fixtures for OpenClaw and OpenCode using a
+temporary `HOME`, committed seed configs, and a stubbed catalog curl. Cover
+explicit-proxy success and failure, MITM success and empty/failure fallback,
+BYO/external behavior, exact generated catalog consumption, and secret-free
+output. Add independent mutations that remove only the request-scoped proxy and
+restore only the invalid authorization scheme; each mutation must be exercised
+and rejected for both bootstraps. Keep the existing Pi mode/fallback/BYO/security
+and independent-mutation proof green, wire all new coverage into CI, and rerun
+the full serial low-priority shell suite.
