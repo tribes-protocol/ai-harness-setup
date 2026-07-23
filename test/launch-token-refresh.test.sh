@@ -146,14 +146,16 @@ for h in claude codex grok; do
   fi
 done
 
-# The retired variable must not linger anywhere: a harness still reading the
-# injected TRIBES_API_KEY would present a key the control plane no longer sets.
-for h in claude codex grok; do
-  if grep -q 'TRIBES_API_KEY' "$REPO/$h/launch.sh"; then
-    fail "$h: launch.sh still references the retired TRIBES_API_KEY"
-  else
-    pass "$h: launch.sh is free of the retired TRIBES_API_KEY"
-  fi
+# The retired variable must not linger in any proxy-capable entrypoint: a harness
+# still reading TRIBES_API_KEY would present a key the control plane no longer sets.
+for h in claude cline codex grok hermes openclaw opencode pi; do
+  for entrypoint in bootstrap.sh launch.sh; do
+    if grep -q 'TRIBES_API_KEY' "$REPO/$h/$entrypoint"; then
+      fail "$h: $entrypoint still references the retired TRIBES_API_KEY"
+    else
+      pass "$h: $entrypoint is free of the retired TRIBES_API_KEY"
+    fi
+  done
 done
 
 # --- keyless BYO: tribes-agent-token mints NOTHING ---------------------------
