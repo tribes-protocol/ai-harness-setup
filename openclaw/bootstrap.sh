@@ -48,9 +48,15 @@ fi
 token="${OPENROUTER_API_KEY:-}"
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ]; then
   proxy="https://openrouter.ai/api/v1"
-  claw_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Placeholder $token" 2>/dev/null \
-    | grep -oE '"id":[[:space:]]*"[^"]+"' \
-    | sed -E 's/.*"([^"]+)"$/{"id": "\1", "name": "\1"}/' | paste -sd, -)
+  claw_models=$(
+    set -- -s --max-time 10
+    if [ -n "${ZIPBOX_EGRESS_PROXY_URL:-}" ]; then
+      set -- "$@" --proxy "$ZIPBOX_EGRESS_PROXY_URL"
+    fi
+    curl "$@" "$proxy/models" -H "Authorization: Bearer $token" 2>/dev/null |
+      grep -oE '"id":[[:space:]]*"[^"]+"' |
+      sed -E 's/.*"([^"]+)"$/{"id": "\1", "name": "\1"}/' | paste -sd, -
+  )
   [ -n "$claw_models" ] || claw_models="{\"id\": \"$TRIBES_LLM_MODEL\", \"name\": \"$TRIBES_LLM_MODEL\"}"
 
   # Substitute every placeholder via awk so the catalog array (which contains

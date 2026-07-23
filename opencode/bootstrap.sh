@@ -53,9 +53,15 @@ mkdir -p "$HOME/.config/opencode"
 token="${OPENROUTER_API_KEY:-}"
 if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ] && [ -e "$CFG" ]; then
   proxy="https://openrouter.ai/api/v1"
-  oc_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Placeholder $token" 2>/dev/null \
-    | grep -oE '"id":[[:space:]]*"[^"]+"' \
-    | sed -E 's/.*"([^"]+)"$/"\1": {}/' | paste -sd, -)
+  oc_models=$(
+    set -- -s --max-time 10
+    if [ -n "${ZIPBOX_EGRESS_PROXY_URL:-}" ]; then
+      set -- "$@" --proxy "$ZIPBOX_EGRESS_PROXY_URL"
+    fi
+    curl "$@" "$proxy/models" -H "Authorization: Bearer $token" 2>/dev/null |
+      grep -oE '"id":[[:space:]]*"[^"]+"' |
+      sed -E 's/.*"([^"]+)"$/"\1": {}/' | paste -sd, -
+  )
   [ -n "$oc_models" ] || oc_models="\"$TRIBES_LLM_MODEL\": {}"
 
   # Substitute the placeholders into the seeded config. The model-catalog map
