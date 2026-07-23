@@ -95,10 +95,10 @@ extract_config_block() {
 
   case "$extract_harness" in
     openclaw)
-      start='^token="\${OPENROUTER_API_KEY:-}"'
+      start='token="${OPENROUTER_API_KEY:-}"'
       ;;
     opencode)
-      start='^CFG="\$HOME/.config/opencode/opencode.json"'
+      start='CFG="$HOME/.config/opencode/opencode.json"'
       ;;
     *)
       return 64
@@ -106,7 +106,7 @@ extract_config_block() {
   esac
 
   awk -v start="$start" '
-    $0 ~ start { capture=1 }
+    index($0, start) == 1 { capture=1 }
     capture { print }
     capture && /^fi$/ { exit }
   ' "$extract_source" > "$extract_output"
