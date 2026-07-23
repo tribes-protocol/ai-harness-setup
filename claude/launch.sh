@@ -48,9 +48,9 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ]; then
   # session default stays the configured model ($TRIBES_LLM_MODEL) to keep cost
   # predictable until the user picks Opus.
   export ANTHROPIC_MODEL="$TRIBES_LLM_MODEL"
-  export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus"
-  export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet"
-  export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku"
+  export ANTHROPIC_DEFAULT_OPUS_MODEL="anthropic/claude-opus-4.8"
+  export ANTHROPIC_DEFAULT_SONNET_MODEL="anthropic/claude-sonnet-4.6"
+  export ANTHROPIC_DEFAULT_HAIKU_MODEL="anthropic/claude-haiku-4.5"
 fi
 
 # --- restore-safety: refresh the on-disk token (manual/exit-shell auth) ----
