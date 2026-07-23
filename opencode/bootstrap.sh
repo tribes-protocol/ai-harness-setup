@@ -36,7 +36,7 @@ else
   echo "[primer] could not fetch render-primer.sh from ref '$REF' — primer NOT rendered" >&2
 fi
 
-# --- proxy-routed config ----------------------------------------------------
+# --- platform-funded config ----------------------------------------------------
 # opencode → @ai-sdk/openai-compatible provider (appends /chat/completions to
 # baseURL). The top-level "permission": "allow" approves every tool in the TUI
 # with no prompt (the auto-approve flag exists only on the headless `opencode
@@ -50,10 +50,10 @@ fi
 CFG="$HOME/.config/opencode/opencode.json"
 mkdir -p "$HOME/.config/opencode"
 
-token="$(tribes-agent-token 2>/dev/null || true)"
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ] && [ -e "$CFG" ]; then
-  proxy="${API_BASE_URL}/llm/proxy"
-  oc_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Bearer $token" 2>/dev/null \
+token="${OPENROUTER_API_KEY:-}"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ] && [ -e "$CFG" ]; then
+  proxy="https://openrouter.ai/api/v1"
+  oc_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Placeholder $token" 2>/dev/null \
     | grep -oE '"id":[[:space:]]*"[^"]+"' \
     | sed -E 's/.*"([^"]+)"$/"\1": {}/' | paste -sd, -)
   [ -n "$oc_models" ] || oc_models="\"$TRIBES_LLM_MODEL\": {}"

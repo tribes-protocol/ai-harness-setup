@@ -23,16 +23,16 @@ else
 fi
 
 # --- restore-safety: refresh the proxy token from the LIVE env --------------
-# The bearer is a short-lived ES256 JWT minted in-VM by tribes-agent-token (signed
+# The placeholder is a provider placeholder supplied in-VM by the platform-provided OpenRouter placeholder (signed
 # with the P-256 agent key). bootstrap.sh baked one into opencode.json (apiKey) on
 # first boot; it goes stale (expiry, or a PAUSE -> RESTORE onto a disk holding the
-# previous boot's token), so re-mint and re-point the on-disk apiKey every launch.
-# Match the apiKey field value so the swap works for any prior token (a JWT has no
+# previous boot's token), so refresh and re-point the on-disk apiKey every launch.
+# Match the apiKey field value so the swap works for any prior token (a placeholder has no
 # sed-special chars). No-op on a cold boot; skipped on a keyless BYO/unset box
-# (file removed, or no mintable key). Config paths are $HOME-relative — the
+# (file removed, or no available key). Config paths are $HOME-relative — the
 # dispatcher decides HOME (old: workspace, new: /root).
 CFG="$HOME/.config/opencode/opencode.json"
-token="$(tribes-agent-token 2>/dev/null || true)"
+token="${OPENROUTER_API_KEY:-}"
 if [ -n "$token" ] && [ -f "$CFG" ]; then
   sed -i "s|\"apiKey\": \"[^\"]*\"|\"apiKey\": \"$token\"|" "$CFG"
 fi
@@ -53,7 +53,7 @@ else
 fi
 
 # --- close the direct-provider escape hatch (#2255) --------------------------
-# On a proxy-routed box the control plane injects a PLACEHOLDER OPENROUTER_API_KEY
+# On a platform-funded box the control plane injects a PLACEHOLDER OPENROUTER_API_KEY
 # (SandboxBootEnv.ts) intended for an egress injector that swaps in the real key.
 # On zipbox no such injector is on this path, so the placeholder is just a stray
 # credential-shaped env var: harnesses that auto-register a provider on env
@@ -69,7 +69,7 @@ fi
 # if it looks like the placeholder"). Value-matching would couple this script to a
 # literal defined in another repo's catalog — a silent no-op the day that value
 # changes — and, worse, it would PRESERVE a real OpenRouter key that reached a
-# proxy-routed box some other way, which is exactly the unmetered bypass this
+# platform-funded box some other way, which is exactly the unmetered bypass this
 # closes. byoKey is the supported way to bring your own key, and it is suppressed
 # by the guard below.
 #
@@ -77,25 +77,26 @@ fi
 # ONLY for proxy-mode, non-byoKey, non-'external' boxes, so BYO/external boxes
 # never enter this branch and keep their own OPENROUTER_API_KEY untouched. This is
 # structural, not a special case — do not add a byoKey conditional here.
-if [ -n "${TRIBES_LLM_MODEL:-}" ] && [ -n "${API_BASE_URL:-}" ]; then
-  unset OPENROUTER_API_KEY
-fi
-
-# --- proxy-routed but NO credential: fail LOUD, don't boot silently broken ----
-# The proxy guard above skips config when the minted $token is empty — correct for a
+# --- platform-funded but NO credential: fail LOUD, don't boot silently broken ----
+# The proxy guard above skips config when the platform key is empty — correct for a
 # BYO box (all three env vars unset). But a box the control plane marked
-# proxy-routed (TRIBES_LLM_MODEL + API_BASE_URL present) that arrives with an
-# EMPTY $token (tribes-agent-token minted nothing) is a FAILED credential mint, not BYO: it boots, every LLM
+# platform-funded (TRIBES_LLM_MODEL + OPENROUTER_API_KEY present) that arrives with an
+# EMPTY $token (the platform-provided OpenRouter placeholder supplied nothing) is a FAILED provider-key delivery, not BYO: it boots, every LLM
 # call 401s (totalTokens:0), and every other vantage reads green. Surface it — a
 # loud boot-log line AND a health marker the fleet can poll — so "booted with no
 # proxy auth" is no longer silent. Cleared on any healthy/BYO boot so the marker
-# is a LIVE signal (self-heals on a restore that re-mints the key). (#2472)
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -z "$token" ]; then
-  echo "[llm-proxy] proxy-routed but tribes-agent-token minted NO bearer this boot — no VALID proxy credential; every LLM call will 401 (mint failed; any on-disk key is stale/revoked)." >&2
+# is a LIVE signal (self-heals on a restore that refreshs the key). (#2472)
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -z "$token" ]; then
+  echo "[llm-egress] metered egress has no OpenRouter placeholder; every platform-funded LLM call would fail closed." >&2
   mkdir -p /opt/tribes 2>/dev/null || true
-  : > /opt/tribes/.llm-proxy-auth-missing 2>/dev/null || true
+  : > /opt/tribes/.llm-egress-key-missing 2>/dev/null || true
 else
-  rm -f /opt/tribes/.llm-proxy-auth-missing 2>/dev/null || true
+  rm -f /opt/tribes/.llm-egress-key-missing 2>/dev/null || true
+fi
+
+if [ -n "${ZIPBOX_EGRESS_PROXY_URL:-}" ]; then
+  export HTTPS_PROXY="$ZIPBOX_EGRESS_PROXY_URL"
+  export HTTP_PROXY="$ZIPBOX_EGRESS_PROXY_URL"
 fi
 
 exec opencode

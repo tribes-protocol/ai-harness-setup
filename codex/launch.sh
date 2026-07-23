@@ -22,11 +22,11 @@ else
   echo "[primer] /opt/tribes/render-primer.sh MISSING — primer NOT refreshed (harness install incomplete / wrong ref?)" >&2
 fi
 
-# config.toml's [model_providers.tribes] reads OPENAI_API_KEY as the Bearer
-# token. The bearer is minted in-VM by tribes-agent-token (an ES256 JWT signed
+# config.toml's [model_providers.tribes] reads OPENAI_API_KEY as the Placeholder
+# token. The placeholder is supplied in-VM by the platform-provided OpenRouter placeholder (an provider placeholder signed
 # with the P-256 agent key); export it only when non-empty so a keyless BYO/
 # external box lets Codex fall back to the user's own credentials.
-token="$(tribes-agent-token 2>/dev/null || true)"
+token="${OPENROUTER_API_KEY:-}"
 [ -n "$token" ] && export OPENAI_API_KEY="$token"
 
 # --- shared agent skills: reconverge on every launch -------------------------
@@ -44,21 +44,26 @@ else
   curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
 fi
 
-# --- proxy-routed but NO credential: fail LOUD, don't boot silently broken ----
-# The proxy guard above skips config when the minted $token is empty — correct for a
+# --- platform-funded but NO credential: fail LOUD, don't boot silently broken ----
+# The proxy guard above skips config when the platform key is empty — correct for a
 # BYO box (all three env vars unset). But a box the control plane marked
-# proxy-routed (TRIBES_LLM_MODEL + API_BASE_URL present) that arrives with an
-# EMPTY $token (tribes-agent-token minted nothing) is a FAILED credential mint, not BYO: it boots, every LLM
+# platform-funded (TRIBES_LLM_MODEL + OPENROUTER_API_KEY present) that arrives with an
+# EMPTY $token (the platform-provided OpenRouter placeholder supplied nothing) is a FAILED provider-key delivery, not BYO: it boots, every LLM
 # call 401s (totalTokens:0), and every other vantage reads green. Surface it — a
 # loud boot-log line AND a health marker the fleet can poll — so "booted with no
 # proxy auth" is no longer silent. Cleared on any healthy/BYO boot so the marker
-# is a LIVE signal (self-heals on a restore that re-mints the key). (#2472)
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -z "$token" ]; then
-  echo "[llm-proxy] proxy-routed but tribes-agent-token minted NO bearer this boot — no VALID proxy credential; every LLM call will 401 (mint failed; any on-disk key is stale/revoked)." >&2
+# is a LIVE signal (self-heals on a restore that refreshs the key). (#2472)
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -z "$token" ]; then
+  echo "[llm-egress] metered egress has no OpenRouter placeholder; every platform-funded LLM call would fail closed." >&2
   mkdir -p /opt/tribes 2>/dev/null || true
-  : > /opt/tribes/.llm-proxy-auth-missing 2>/dev/null || true
+  : > /opt/tribes/.llm-egress-key-missing 2>/dev/null || true
 else
-  rm -f /opt/tribes/.llm-proxy-auth-missing 2>/dev/null || true
+  rm -f /opt/tribes/.llm-egress-key-missing 2>/dev/null || true
+fi
+
+if [ -n "${ZIPBOX_EGRESS_PROXY_URL:-}" ]; then
+  export HTTPS_PROXY="$ZIPBOX_EGRESS_PROXY_URL"
+  export HTTP_PROXY="$ZIPBOX_EGRESS_PROXY_URL"
 fi
 
 exec codex --dangerously-bypass-approvals-and-sandbox

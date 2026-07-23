@@ -35,7 +35,7 @@ else
   echo "[primer] could not fetch render-primer.sh from ref '$REF' — primer NOT rendered" >&2
 fi
 
-# --- proxy-routed config ----------------------------------------------------
+# --- platform-funded config ----------------------------------------------------
 # Fill the committed seed .openclaw/openclaw.json placeholders. OpenClaw uses a
 # custom openai-completions provider (appends /chat/completions) and REQUIRES it
 # to declare its models as an array of {id,name} objects — a provider with no
@@ -45,10 +45,10 @@ fi
 # to just the default model if the fetch hiccups at boot. Skip gracefully if the
 # proxy env is absent — the placeholders are left untouched and the CLI falls
 # back to whatever creds the user supplies.
-token="$(tribes-agent-token 2>/dev/null || true)"
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
-  proxy="${API_BASE_URL}/llm/proxy"
-  claw_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Bearer $token" 2>/dev/null \
+token="${OPENROUTER_API_KEY:-}"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ]; then
+  proxy="https://openrouter.ai/api/v1"
+  claw_models=$(curl -s --max-time 10 "$proxy/models" -H "Authorization: Placeholder $token" 2>/dev/null \
     | grep -oE '"id":[[:space:]]*"[^"]+"' \
     | sed -E 's/.*"([^"]+)"$/{"id": "\1", "name": "\1"}/' | paste -sd, -)
   [ -n "$claw_models" ] || claw_models="{\"id\": \"$TRIBES_LLM_MODEL\", \"name\": \"$TRIBES_LLM_MODEL\"}"

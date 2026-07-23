@@ -12,7 +12,7 @@
 #
 # Installs the Cline CLI ONLY. The `cline auth` command that writes the provider
 # file is NOT here — it lives in launch.sh and runs EVERY boot, so each launch
-# re-auths with a freshly-minted bearer (tribes-agent-token; a stale token baked
+# re-auths with a live provider placeholder (the platform-provided OpenRouter placeholder; a stale token baked
 # at first boot would otherwise 401 after a restore). Cline has no env-based proxy
 # config and no theme support (hardcoded palette).
 set -e
@@ -44,10 +44,10 @@ else
   echo "[primer] could not fetch render-primer.sh from ref '$REF' — primer NOT rendered" >&2
 fi
 
-# --- proxy-routed config: see launch.sh -------------------------------------
+# --- platform-funded config: see launch.sh -------------------------------------
 # The `cline auth openai-compatible ...` command that writes cline's provider
 # file (~/.cline/data/settings/providers.json) is deliberately in launch.sh, NOT
-# here: it must re-run on EVERY boot so a RESTORE picks up the re-minted token
+# here: it must re-run on EVERY boot so a RESTORE picks up the refreshed token
 # (running it once here would leave a restored box authed with the revoked key).
 
 # --- safety net -------------------------------------------------------------
