@@ -12,7 +12,7 @@ Everything else this skill says hangs off that one sentence. There are exactly
 two egress paths, a box is on exactly one of them, and you rarely pick — the
 platform decides from the harness and the tag.
 
-This is **not** the LLM proxy. `/llm/proxy` (the agent's own metered model
+This is also the LLM billing path. Provider-funded model traffic
 calls) is a separate system; see the last section. This skill is about how your
 **outbound HTTP to third-party data/API providers** is keyed and metered.
 
@@ -144,7 +144,7 @@ Do not treat MITM as free egress.
 
 ## Not this: the LLM proxy
 
-`/llm/proxy` meters the agent's **own** model calls and is unrelated to egress
+The same MITM/HTTP-proxy path meters the agent's **own** model calls and egress
 key injection. "The trading harness needs no LLM-proxy indirection" means its
 data-provider egress goes through the transparent MITM path, not the
 per-request tollbooth — it does **not** mean egress is free (see "Billing

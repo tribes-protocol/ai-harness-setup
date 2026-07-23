@@ -17,7 +17,7 @@ set -e
 # `node-deps` stage runs `playwright install --with-deps chromium`, which downloads
 # the ~170MB Chromium engine AND apt-installs the heavy X11/nss/atk/font system-lib
 # stack — by far the slowest part of a cold boot (measured ~42s on a fast-network
-# host, minutes on a slow one). A proxy-routed chat agent in a microVM never drives
+# host, minutes on a slow one). A platform-funded chat agent in a microVM never drives
 # a real browser, so none of that is needed on the interactive boot path. CRUCIAL:
 # --skip-browser does NOT skip the node-deps the TUI needs — the installer ALWAYS
 # runs `npm install` first and only gates the `playwright install chromium` step on
@@ -91,7 +91,7 @@ else
   echo "[primer] could not fetch render-primer.sh from ref '$REF' — primer NOT rendered" >&2
 fi
 
-# --- proxy-routed config ----------------------------------------------------
+# --- platform-funded config ----------------------------------------------------
 # Fill the seed config's placeholders. Hermes declares a user `tribes` provider in
 # config.yaml's providers map and points model.provider at it (the built-in
 # openai-api provider has a hardcoded Nous baseUrl, so an env override never takes
@@ -99,9 +99,9 @@ fi
 # append /chat/completions to `api`. We omit a provider `models` list so the picker
 # discovers the full catalog from the proxy's GET /models; model.default preselects
 # ours. Skip gracefully if the proxy env is absent (CLI falls back to user creds).
-token="$(tribes-agent-token 2>/dev/null || true)"
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
-  sed -i "s|__TRIBES_PROXY__|${API_BASE_URL}/llm/proxy|g" "$HOME/.hermes/config.yaml"
+token="${OPENROUTER_API_KEY:-}"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ]; then
+  sed -i "s|__TRIBES_PROXY__|https://openrouter.ai/api/v1|g" "$HOME/.hermes/config.yaml"
   sed -i "s|__TRIBES_TOKEN__|$token|g" "$HOME/.hermes/config.yaml"
   sed -i "s|__TRIBES_MODEL__|$TRIBES_LLM_MODEL|g" "$HOME/.hermes/config.yaml"
   # Resolve the create-time skin now so no __TRIBES_SKIN__ placeholder reaches the

@@ -25,22 +25,22 @@ else
   echo "[primer] /opt/tribes/render-primer.sh MISSING — primer NOT refreshed (harness install incomplete / wrong ref?)" >&2
 fi
 
-# --- proxy-routed: point claude at the metered LLM proxy --------------------
-# When the control plane marks claude proxy-routed it injects TRIBES_LLM_MODEL +
-# API_BASE_URL; the per-sandbox bearer is minted in-VM by tribes-agent-token (a
-# short ES256 JWT signed with the P-256 agent key). Point claude's Anthropic
-# Messages surface at `${API_BASE_URL}/llm/proxy`; ANTHROPIC_AUTH_TOKEN is sent as
-# the Authorization: Bearer header. If the proxy env is absent or the box is
-# keyless (BYO/external — no mintable JWT) we skip and claude falls back to
+# --- platform-funded: point claude at the metered LLM proxy --------------------
+# When the control plane marks claude platform-funded it injects TRIBES_LLM_MODEL +
+# OPENROUTER_API_KEY; the provider placeholder is supplied in-VM by the platform-provided OpenRouter placeholder (a
+# short provider placeholder signed with the P-256 agent key). Point claude's Anthropic
+# Messages surface at `https://openrouter.ai/api`; ANTHROPIC_AUTH_TOKEN is sent as
+# the Authorization: Placeholder header. If the proxy env is absent or the box is
+# keyless (BYO/external — no available placeholder) we skip and claude falls back to
 # whatever creds the user supplies. Kept even though settings.json's env block
 # (below) covers the same values: it's what actually authenticates the launched
 # harness if the on-disk config was ever left mid-edit (bootstrap fill failure) or
-# a BYO box flips to proxy-routed on a restore (bootstrap already ran once and
+# a BYO box flips to platform-funded on a restore (bootstrap already ran once and
 # won't re-seed the placeholders).
-# Mint the bearer once; both the env export and the on-disk refresh below use it.
-token="$(tribes-agent-token 2>/dev/null || true)"
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
-  proxy="${API_BASE_URL}/llm/proxy"
+# Read the placeholder once; both the env export and the on-disk refresh below use it.
+token="${OPENROUTER_API_KEY:-}"
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$token" ]; then
+  proxy="https://openrouter.ai/api"
   export ANTHROPIC_BASE_URL="$proxy"
   export ANTHROPIC_AUTH_TOKEN="$token"
   # Map each /model tier to a real proxy model (all three allow-listed) so
@@ -54,11 +54,11 @@ if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -n "$token" ]; then
 fi
 
 # --- restore-safety: refresh the on-disk token (manual/exit-shell auth) ----
-# The bearer is a short-lived JWT minted per launch, so the token baked into
-# settings.json at bootstrap goes stale. Re-point it at the freshly-minted key on
+# The placeholder is a provider placeholder supplied per launch, so the token baked into
+# settings.json at bootstrap goes stale. Re-point it at the freshly-supplied key on
 # every launch — same idiom as the other file-based harnesses (see CONTRACT.md).
 # Match the ANTHROPIC_AUTH_TOKEN field value so the swap works for any prior token
-# (a JWT carries no sed-special chars). No-op on a cold boot (bootstrap just wrote
+# (a placeholder carries no sed-special chars). No-op on a cold boot (bootstrap just wrote
 # this same value); skipped on BYO/unset (bootstrap.sh already stripped the env block).
 CFG="$HOME/.claude/settings.json"
 if [ -n "$token" ] && [ -f "$CFG" ]; then
@@ -80,22 +80,27 @@ else
   curl -fsSL --max-time 10 "$SKILLS_RAW_BASE/${TRIBES_HARNESS_REF:-main}/install-skills.sh" | sh || true
 fi
 
-# --- proxy-routed but NO credential: fail LOUD, don't boot silently broken ----
-# The proxy guard above skips config when the minted $token is empty — correct for a
+# --- platform-funded but NO credential: fail LOUD, don't boot silently broken ----
+# The proxy guard above skips config when the platform key is empty — correct for a
 # BYO box (all three env vars unset). But a box the control plane marked
-# proxy-routed (TRIBES_LLM_MODEL + API_BASE_URL present) that arrives with an
-# EMPTY $token (tribes-agent-token minted nothing) is a FAILED credential mint, not BYO: it boots, every LLM
+# platform-funded (TRIBES_LLM_MODEL + OPENROUTER_API_KEY present) that arrives with an
+# EMPTY $token (the platform-provided OpenRouter placeholder supplied nothing) is a FAILED provider-key delivery, not BYO: it boots, every LLM
 # call 401s (totalTokens:0), and every other vantage reads green. Surface it — a
 # loud boot-log line AND a health marker the fleet can poll — so "booted with no
 # proxy auth" is no longer silent. Cleared on any healthy/BYO boot so the marker
-# is a LIVE signal (self-heals on a restore that re-mints the key). (#2472)
-if [ -n "$TRIBES_LLM_MODEL" ] && [ -n "$API_BASE_URL" ] && [ -z "$token" ]; then
-  echo "[llm-proxy] proxy-routed but tribes-agent-token minted NO bearer this boot — no VALID proxy credential; every LLM call will 401 (mint failed; any on-disk key is stale/revoked)." >&2
+# is a LIVE signal (self-heals on a restore that refreshs the key). (#2472)
+if [ -n "$TRIBES_LLM_MODEL" ] && [ -z "$token" ]; then
+  echo "[llm-egress] metered egress has no OpenRouter placeholder; every platform-funded LLM call would fail closed." >&2
   mkdir -p /opt/tribes 2>/dev/null || true
-  : > /opt/tribes/.llm-proxy-auth-missing 2>/dev/null || true
+  : > /opt/tribes/.llm-egress-key-missing 2>/dev/null || true
 else
-  rm -f /opt/tribes/.llm-proxy-auth-missing 2>/dev/null || true
+  rm -f /opt/tribes/.llm-egress-key-missing 2>/dev/null || true
 fi
 
 # IS_SANDBOX=1 lets --dangerously-skip-permissions run as root.
+if [ -n "${ZIPBOX_EGRESS_PROXY_URL:-}" ]; then
+  export HTTPS_PROXY="$ZIPBOX_EGRESS_PROXY_URL"
+  export HTTP_PROXY="$ZIPBOX_EGRESS_PROXY_URL"
+fi
+
 exec env IS_SANDBOX=1 claude --dangerously-skip-permissions
